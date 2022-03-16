@@ -12,3 +12,12 @@ going to be integrated into [Astra](https://git.sr.ht/~redstrate/astra) as well.
 * Be integratable into launchers for updating support.
 * Can export penumbra mods, I have no interest in exporting in TexTools's format.
 * Can export/edit some formats such as models, and metadata/exl.
+
+## Dependencies
+* fmt for formatting
+* z for zlib support, needed for dat files
+* unshield for extracting cab files for bootstrapping
+
+## Features
+* Can read index/index2/dat/exh/exl files (see Xparser.h)
+* Can extract bootstrap files required to start FFXIV for the first time (see installextract.h)
