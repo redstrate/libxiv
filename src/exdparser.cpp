@@ -26,7 +26,9 @@ struct ExcelDataRowHeader {
     uint16_t rowCount;
 };
 
-void readEXD(EXH& exh, ExcelDataPagination& page) {
+EXD readEXD(EXH& exh, ExcelDataPagination& page) {
+    EXD exd;
+
     auto path = fmt::format("{}_{}.exd", "map", page.startId);
 
     FILE* file = fopen(path.data(), "rb");
@@ -50,6 +52,8 @@ void readEXD(EXH& exh, ExcelDataPagination& page) {
     }
 
     for(auto& offset : dataOffsets) {
+        Row row;
+
         fseek(file, exh.header.dataOffset + offset.offset, SEEK_SET);
 
         ExcelDataRowHeader rowHeader;
@@ -61,6 +65,8 @@ void readEXD(EXH& exh, ExcelDataPagination& page) {
         const int rowOffset = offset.offset + 6;
 
         for(auto column : exh.columnDefinitions) {
+            Column c;
+
             switch(column.type) {
                 case String:
                 {
@@ -79,11 +85,19 @@ void readEXD(EXH& exh, ExcelDataPagination& page) {
                     }
 
                     fmt::print("{}\n", string.data());
+
+                    c.data = string;
                 }
                 break;
                 default:
                     break;
             }
+
+            row.data.push_back(c);
         }
+
+        exd.rows.push_back(row);
     }
+
+    return exd;
 }
