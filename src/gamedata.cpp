@@ -53,7 +53,7 @@ std::tuple<std::string, std::string> GameData::calculateRepositoryCategory(std::
     std::string repository, category;
 
     auto tokens = tokenize(path, "/");
-    if(stringContains(tokens[1], "ex") && !stringContains(tokens[0], "exd")) {
+    if(stringContains(tokens[1], "ex") && !stringContains(tokens[0], "exd") && !stringContains(tokens[0], "exh")) {
         repository = tokens[1];
     } else {
         repository = "ffxiv";
@@ -78,6 +78,9 @@ std::string GameData::calculateFilename(const int category, const int expansion,
 void GameData::extractFile(std::string_view dataFilePath, std::string_view outPath) {
     const uint64_t hash = calculateHash(dataFilePath);
     auto [repository, category] = calculateRepositoryCategory(dataFilePath);
+
+    fmt::print("repository = {}\n", repository);
+    fmt::print("category = {}\n", category);
 
     // TODO: handle platforms other than win32
     auto indexFilename = calculateFilename(categoryToID[category], getExpansionID(repository), 0, "win32", "index");
@@ -113,6 +116,8 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
             } info;
 
             fread(&info, sizeof(FileInfo), 1, file);
+
+            fmt::print("file size = {}\n", info.fileSize);
 
             if(info.fileType != FileType::Standard) {
                 throw std::runtime_error("File type is not handled yet for " + std::string(dataFilePath));
@@ -179,5 +184,5 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
         }
     }
 
-    fmt::print("Extracted {} to {}", dataFilePath, outPath);
+    fmt::print("Extracted {} to {}\n", dataFilePath, outPath);
 }
