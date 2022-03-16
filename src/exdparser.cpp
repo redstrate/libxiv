@@ -26,6 +26,16 @@ struct ExcelDataRowHeader {
     uint16_t rowCount;
 };
 
+template<typename T>
+std::string readData(FILE* file, int offset) {
+    fseek(file, offset, SEEK_SET);
+
+    T value;
+    fread(&value, sizeof value, 1, file);
+    endianSwap(&value);
+    return std::to_string(value);
+}
+
 EXD readEXD(EXH& exh, ExcelDataPagination& page) {
     EXD exd;
 
@@ -89,7 +99,35 @@ EXD readEXD(EXH& exh, ExcelDataPagination& page) {
                     c.data = string;
                 }
                 break;
+                case Int8:
+                    c.data = readData<int8_t>(file, rowOffset + column.offset);
+                    break;
+                case UInt8:
+                    c.data = readData<uint8_t>(file, rowOffset + column.offset);
+                    break;
+                case Int16:
+                    c.data = readData<int16_t>(file, rowOffset + column.offset);
+                    break;
+                case UInt16:
+                    c.data = readData<uint16_t>(file, rowOffset + column.offset);
+                    break;
+                case Int32:
+                    c.data = readData<int32_t>(file, rowOffset + column.offset);
+                    break;
+                case UInt32:
+                    c.data = readData<uint32_t>(file, rowOffset + column.offset);
+                    break;
+                case Float32:
+                    c.data = readData<float>(file, rowOffset + column.offset);
+                    break;
+                case Int64:
+                    c.data = readData<int64_t>(file, rowOffset + column.offset);
+                    break;
+                case UInt64:
+                    c.data = readData<uint64_t>(file, rowOffset + column.offset);
+                    break;
                 default:
+                    c.data = "undefined";
                     break;
             }
 
