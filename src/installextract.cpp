@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <libunshield.h>
 #include <fmt/format.h>
+#include <filesystem>
 
 const std::array filesToExtract = {"data1.cab", "data1.hdr", "data2.cab"};
 
@@ -32,7 +33,7 @@ const std::array gameComponent = {
         "ffxivgame.ver"
 };
 
-void extractBootstrapFiles(const std::string_view installer) {
+void extractBootstrapFiles(const std::string_view installer, const std::string_view directory) {
     FILE* file = fopen(installer.data(), "rb");
     if(file == nullptr) {
         throw std::runtime_error("Failed to open installer {}" + std::string(installer));
@@ -65,6 +66,7 @@ void extractBootstrapFiles(const std::string_view installer) {
 
             if(lastNeedle != nullptr) {
                 FILE* newFile = fopen(lastFilename.data(), "wb");
+                fmt::print("Wrote {}!\n", lastFilename);
 
                 if(lastFilename == "data1.hdr") {
                     fwrite(lastNeedle + 30, p - lastNeedle - 42, 1, newFile);
@@ -79,6 +81,7 @@ void extractBootstrapFiles(const std::string_view installer) {
             lastFilename = fileName;
             lastNeedle = p;
             fileSize -= (p + 4) - buffer;
+            buffer = p + realFileName.length();
         }
 
         // write final file
@@ -90,6 +93,21 @@ void extractBootstrapFiles(const std::string_view installer) {
         fclose(newFile);
     }
 
+    if(!std::filesystem::exists(directory)) {
+        fmt::print("Game install directory doesn't exist yet, creating...\n");
+        std::filesystem::create_directories(directory);
+    }
+
+    if(!std::filesystem::exists(std::filesystem::path(directory) / "boot")) {
+        fmt::print("Boot directory doesn't exist yet, creating...\n");
+        std::filesystem::create_directory(std::filesystem::path(directory) / "boot");
+    }
+
+    if(!std::filesystem::exists(std::filesystem::path(directory) / "game")) {
+        fmt::print("Game directory doesn't exist yet, creating...\n");
+        std::filesystem::create_directory(std::filesystem::path(directory) / "game");
+    }
+
     auto unshield = unshield_open("data1.cab");
     const int fileCount = unshield_file_count(unshield);
 
@@ -99,15 +117,19 @@ void extractBootstrapFiles(const std::string_view installer) {
         for(auto bootName : bootComponent) {
             fmt::print("Extracted {}\n", bootName);
 
-            if(strcmp(filename, bootName) == 0)
-                unshield_file_save(unshield, i, bootName);
+            if(strcmp(filename, bootName) == 0) {
+                std::string saveFilename = fmt::format("{}/boot/{}", directory, bootName);
+                unshield_file_save(unshield, i, saveFilename.data());
+            }
         }
 
         for(auto gameName : gameComponent) {
             fmt::print("Extracted {}\n", gameName);
 
-            if(strcmp(filename, gameName) == 0)
-                unshield_file_save(unshield, i, gameName);
+            if(strcmp(filename, gameName) == 0) {
+                std::string saveFilename = fmt::format("{}/game/{}", directory, gameName);
+                unshield_file_save(unshield, i, saveFilename.data());
+            }
         }
     }
 
