@@ -10,7 +10,8 @@ add_library(libxiv STATIC
         src/compression.cpp
         src/exhparser.cpp
         src/exdparser.cpp
-        src/installextract.cpp)
+        src/installextract.cpp
+        src/patch.cpp)
 target_include_directories(libxiv PUBLIC include PRIVATE src)
 target_link_libraries(libxiv PUBLIC
         unshield
