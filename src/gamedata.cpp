@@ -1,6 +1,6 @@
 #include "gamedata.h"
 #include "indexparser.h"
-#include "crc32.h"
+#include "crc32checksum.h"
 #include "compression.h"
 #include "string_utils.h"
 

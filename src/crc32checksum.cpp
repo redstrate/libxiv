@@ -1,4 +1,4 @@
-#include "crc32.h"
+#include "crc32checksum.h"
 
 void CRC32::generate_table(uint32_t(&table)[256]) {
     uint32_t polynomial = 0xEDB88320;

@@ -1,5 +1,7 @@
 project(libxiv)
 
+include(FetchContent)
+
 find_package(fmt QUIET)
 
 if(TARGET fmt::fmt)
@@ -14,6 +16,8 @@ else()
     GIT_REPOSITORY https://github.com/fmtlib/fmt
     GIT_TAG        master
     )
+
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
     FetchContent_MakeAvailable(fmt)
 
@@ -41,16 +45,22 @@ else()
             GIT_TAG        master
     )
 
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
     FetchContent_MakeAvailable(zlib)
 
-    set(LIBRARIES zlib ${LIBRARIES})
-endif()
+    # welcome to hell, cmake.
+    include_directories(${CMAKE_BINARY_DIR}/_deps/zlib-src)
+    # NO REALLY, HELL IS THIS WAY
+    include_directories(${CMAKE_BINARY_DIR}/_deps/zlib-build)
 
+    set(LIBRARIES zlibstatic ${LIBRARIES})
+endif()
 
 add_library(libxiv STATIC
         src/fiinparser.cpp
         src/indexparser.cpp
-        src/crc32.cpp
+        src/crc32checksum.cpp
         src/gamedata.cpp
         src/compression.cpp
         src/exhparser.cpp
