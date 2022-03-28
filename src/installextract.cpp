@@ -1,5 +1,6 @@
 #include "installextract.h"
 
+#ifdef UNSHIELD_SUPPORTED
 #include <cstdio>
 #include <stdexcept>
 #include <libunshield.h>
@@ -135,3 +136,11 @@ void extractBootstrapFiles(const std::string_view installer, const std::string_v
 
     fclose(file);
 }
+
+#else
+
+void extractBootstrapFiles(const std::string_view installer, const std::string_view directory) {
+    // no op
+}
+
+#endif

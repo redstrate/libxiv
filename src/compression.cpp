@@ -2,8 +2,10 @@
 
 #include <zlib.h>
 #include <stdexcept>
+#include <string>
 
-// adopted from https://github.com/ahom/ffxiv_reverse/blob/312a0af8b58929fab48438aceae8da587be9407f/xiv/utils/src/zlib.cpp#L31
+// adopted from
+// https://github.com/ahom/ffxiv_reverse/blob/312a0af8b58929fab48438aceae8da587be9407f/xiv/utils/src/zlib.cpp#L31
 void zlib::no_header_decompress(uint8_t* in, uint32_t in_size, uint8_t* out, uint32_t out_size) {
     z_stream strm = {};
     strm.avail_in = in_size;

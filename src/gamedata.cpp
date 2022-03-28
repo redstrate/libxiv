@@ -6,6 +6,7 @@
 
 #include <string>
 #include <algorithm>
+#include <unordered_map>
 #include <fmt/printf.h>
 
 // TODO: should be enum?

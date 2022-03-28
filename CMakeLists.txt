@@ -1,6 +1,51 @@
 project(libxiv)
 
-find_package(fmt)
+find_package(fmt QUIET)
+
+if(TARGET fmt::fmt)
+    message("Using system library for fmt")
+
+    set(LIBRARIES fmt::fmt ${LIBRARIES})
+else()
+    message("Using built-in fmt")
+
+    FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt
+    GIT_TAG        master
+    )
+
+    FetchContent_MakeAvailable(fmt)
+
+    set(LIBRARIES fmt::fmt ${LIBRARIES})
+endif()
+
+# note: unshield does not work on windows per maintainer notice in README, so we might as well not even attempt to look
+# for it.
+if(NOT WIN32)
+    set(LIBRARIES unshield ${LIBRARIES})
+endif()
+
+find_package(ZLIB QUIET)
+
+if(TARGET ZLIB::ZLIB)
+    message("Using system library for zlib")
+
+    set(LIBRARIES ZLIB::ZLIB ${LIBRARIES})
+else()
+    message("Using built-in zlib")
+
+    FetchContent_Declare(
+            zlib
+            GIT_REPOSITORY https://github.com/madler/zlib.git
+            GIT_TAG        master
+    )
+
+    FetchContent_MakeAvailable(zlib)
+
+    set(LIBRARIES zlib ${LIBRARIES})
+endif()
+
 
 add_library(libxiv STATIC
         src/fiinparser.cpp
@@ -14,6 +59,4 @@ add_library(libxiv STATIC
         src/patch.cpp)
 target_include_directories(libxiv PUBLIC include PRIVATE src)
 target_link_libraries(libxiv PUBLIC
-        unshield
-        fmt::fmt
-        z)
+        ${LIBRARIES})

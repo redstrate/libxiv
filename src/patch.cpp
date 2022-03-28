@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <cstdio>
 #include <fmt/core.h>
+#include <vector>
 
 #include "utility.h"
 #include "compression.h"
