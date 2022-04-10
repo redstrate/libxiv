@@ -27,7 +27,11 @@ endif()
 # note: unshield does not work on windows per maintainer notice in README, so we might as well not even attempt to look
 # for it.
 if(NOT WIN32)
-    set(LIBRARIES unshield ${LIBRARIES})
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(libunshield REQUIRED libunshield)
+
+    set(LIBRARIES ${libunshield_LIBRARIES} ${LIBRARIES})
+    set(LIB_DIRS ${libunshield_LIBRARY_DIRS})
 endif()
 
 find_package(ZLIB QUIET)
@@ -68,5 +72,5 @@ add_library(libxiv STATIC
         src/installextract.cpp
         src/patch.cpp)
 target_include_directories(libxiv PUBLIC include PRIVATE src)
-target_link_libraries(libxiv PUBLIC
-        ${LIBRARIES})
+target_link_libraries(libxiv PUBLIC ${LIBRARIES})
+target_link_directories(libxiv PUBLIC ${LIB_DIRS})

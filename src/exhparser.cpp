@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include <algorithm>
+#include <string>
 
 EXH readEXH(const std::string_view path) {
     EXH exh;

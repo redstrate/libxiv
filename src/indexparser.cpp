@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include <string>
 
 template<class T>
 void commonParseSqPack(FILE* file, IndexFile<T>& index) {
