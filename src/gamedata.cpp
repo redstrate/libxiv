@@ -3,6 +3,7 @@
 #include "crc32checksum.h"
 #include "compression.h"
 #include "string_utils.h"
+#include "exlparser.h"
 
 #include <string>
 #include <algorithm>
@@ -31,6 +32,20 @@ std::unordered_map<std::string_view, int> categoryToID = {
 
 GameData::GameData(const std::string_view dataDirectory) {
     this->dataDirectory = dataDirectory;
+
+    extractFile("exd/root.exl", "root.exl");
+
+    rootEXL = readEXL("root.exl");
+}
+
+std::vector<std::string> GameData::getAllSheetNames() {
+    std::vector<std::string> names;
+
+    for(auto row : rootEXL.rows) {
+        names.push_back(row.name);
+    }
+
+    return names;
 }
 
 uint64_t GameData::calculateHash(const std::string_view path) {
@@ -86,12 +101,16 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
     // TODO: handle platforms other than win32
     auto indexFilename = calculateFilename(categoryToID[category], getExpansionID(repository), 0, "win32", "index");
 
+    fmt::print("calculated index filename: ");
+
     // TODO: handle hashes in index2 files (we can read them but it's not setup yet.)
     auto indexFile = readIndexFile(dataDirectory + "/" + repository + "/" + indexFilename);
 
     for(const auto entry : indexFile.entries) {
         if(entry.hash == hash) {
             auto dataFilename = calculateFilename(categoryToID[category], getExpansionID(repository), entry.dataFileId, "win32", "dat0");
+
+            fmt::print("Opening data file {}...\n", dataFilename);
 
             FILE* file = fopen((dataDirectory + "/" + repository + "/" + dataFilename).c_str(), "rb");
             if(file == nullptr) {
@@ -186,4 +205,29 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
     }
 
     fmt::print("Extracted {} to {}\n", dataFilePath, outPath);
+}
+
+std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
+    fmt::print("Beginning to read excel sheet {}...\n", name);
+
+    for(auto row : rootEXL.rows) {
+        if(row.name == name) {
+            fmt::print("Found row {} at id {}!\n", name, row.id);
+
+            // we want it as lowercase (Item -> item)
+            std::string newFilename = name.data();
+            std::transform(newFilename.begin(), newFilename.end(), newFilename.begin(),
+                           [](unsigned char c){ return std::tolower(c); });
+
+            std::string exhFilename = "exd/" + newFilename + ".exh";
+
+            extractFile(exhFilename, newFilename + ".exh");
+
+            fmt::print("Done extracting files, now parsing...\n");
+
+            return readEXH(newFilename + ".exh");
+        }
+    }
+
+    return {};
 }

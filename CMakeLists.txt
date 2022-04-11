@@ -70,7 +70,8 @@ add_library(libxiv STATIC
         src/exhparser.cpp
         src/exdparser.cpp
         src/installextract.cpp
-        src/patch.cpp)
+        src/patch.cpp
+        src/exlparser.cpp)
 target_include_directories(libxiv PUBLIC include PRIVATE src)
 target_link_libraries(libxiv PUBLIC ${LIBRARIES})
 target_link_directories(libxiv PUBLIC ${LIB_DIRS})

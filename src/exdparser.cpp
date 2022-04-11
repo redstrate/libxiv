@@ -36,10 +36,14 @@ std::string readData(FILE* file, int offset) {
     return std::to_string(value);
 }
 
-EXD readEXD(EXH& exh, ExcelDataPagination& page) {
-    EXD exd;
+std::string getEXDFilename(EXH& exh, std::string_view name, ExcelDataPagination& page) {
+    auto path = fmt::format("{}_{}.exd", name, page.startId);
 
-    auto path = fmt::format("{}_{}.exd", "map", page.startId);
+    return path;
+}
+
+EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
+    EXD exd;
 
     FILE* file = fopen(path.data(), "rb");
     if(file == nullptr) {
@@ -90,7 +94,7 @@ EXD readEXD(EXH& exh, ExcelDataPagination& page) {
                     std::string string;
 
                     int ch;
-                    while ((ch = fgetc(file)) != '\0') {
+                    while ((ch = fgetc(file)) != '\0' && ch != '\377') {
                         string.push_back((char)ch);
                     }
 

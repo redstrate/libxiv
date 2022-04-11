@@ -19,4 +19,6 @@ struct EXD {
     std::vector<Row> rows;
 };
 
-EXD readEXD(EXH& exh, ExcelDataPagination& page);
+std::string getEXDFilename(EXH& exh, std::string_view name, ExcelDataPagination& page);
+
+EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page);

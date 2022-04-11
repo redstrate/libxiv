@@ -2,6 +2,9 @@
 
 #include <string_view>
 #include <string>
+#include <optional>
+#include "exhparser.h"
+#include "exlparser.h"
 
 /*
  * This handles reading/extracting the raw data from game data packs, such as dat0, index and index2 files.
@@ -23,6 +26,10 @@ public:
      */
     void extractFile(std::string_view dataFilePath, std::string_view outPath);
 
+    std::optional<EXH> readExcelSheet(std::string_view name);
+
+    std::vector<std::string> getAllSheetNames();
+
 private:
     /*
      * This returns a proper SQEX-style filename for index, index2, and dat files.
@@ -41,4 +48,6 @@ private:
     uint64_t calculateHash(std::string_view path);
 
     std::string dataDirectory;
+
+    EXL rootEXL;
 };
