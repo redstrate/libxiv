@@ -36,10 +36,12 @@ std::string readData(FILE* file, int offset) {
     return std::to_string(value);
 }
 
-std::string getEXDFilename(EXH& exh, std::string_view name, ExcelDataPagination& page) {
-    auto path = fmt::format("{}_{}.exd", name, page.startId);
-
-    return path;
+std::string getEXDFilename(EXH& exh, std::string_view name, std::string_view lang, ExcelDataPagination& page) {
+    if(lang.empty()) {
+        return fmt::format("{}_{}.exd", name, page.startId);
+    } else {
+        return fmt::format("{}_{}_{}.exd", name, page.startId, lang);
+    }
 }
 
 EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {

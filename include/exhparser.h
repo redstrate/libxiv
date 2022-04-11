@@ -3,6 +3,8 @@
 #include <string_view>
 #include <vector>
 
+#include "language.h"
+
 // taken from https://xiv.dev/game-data/file-formats/excel
 struct ExhHeader {
     char magic[0x4];
@@ -51,24 +53,6 @@ struct ExcelColumnDefinition {
 struct ExcelDataPagination {
     uint32_t startId;
     uint32_t rowCount;
-};
-
-enum Language : uint16_t {
-    None,
-    // ja
-    Japanese,
-    // en
-    English,
-    // de
-    German,
-    // fr
-    French,
-    // chs
-    ChineseSimplified,
-    // cht
-    ChineseTraditional,
-    // ko
-    Korean
 };
 
 struct EXH {
