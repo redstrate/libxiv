@@ -5,8 +5,8 @@ mirror](https://img.shields.io/badge/mirror-GitHub-black.svg?logo=github)](https
 [![ryne.moe
 mirror](https://img.shields.io/badge/mirror-ryne.moe-red.svg?logo=git)](https://git.ryne.moe/redstrate/libxiv)
 
-A modding framework for FFXIV written in C++. This is intended for use [Novus](https://git.sr.ht/~redstrate/novus), my custom modding tool - but it's eventually
-going to be integrated into [Astra](https://git.sr.ht/~redstrate/astra) as well.
+A modding framework for FFXIV written in C++. This is used in [Novus](https://git.sr.ht/~redstrate/novus) (my custom modding tool) and
+[Astra](https://git.sr.ht/~redstrate/astra) (my custom launcher) but can easily be integrated into your own projects.
 
 **Note:** This is still an experimental and in-development library. Thus, I have not tagged any stable releases. It's recommended just to checkout from main.
 
