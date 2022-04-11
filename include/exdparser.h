@@ -9,6 +9,7 @@ struct ExcelDataPagination;
 
 struct Column {
     std::string data;
+    std::string type; // for debug
 };
 
 struct Row {

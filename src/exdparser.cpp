@@ -27,13 +27,18 @@ struct ExcelDataRowHeader {
 };
 
 template<typename T>
-std::string readData(FILE* file, int offset) {
+T readDataRaw(FILE* file, int offset) {
     fseek(file, offset, SEEK_SET);
 
     T value;
     fread(&value, sizeof value, 1, file);
     endianSwap(&value);
-    return std::to_string(value);
+    return value;
+}
+
+template<typename T>
+std::string readData(FILE* file, int offset) {
+    return std::to_string(readDataRaw<T>(file, offset));
 }
 
 std::string getEXDFilename(EXH& exh, std::string_view name, std::string_view lang, ExcelDataPagination& page) {
@@ -103,37 +108,63 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                     fmt::print("{}\n", string.data());
 
                     c.data = string;
+                    c.type = "String";
                 }
                 break;
                 case Int8:
                     c.data = readData<int8_t>(file, rowOffset + column.offset);
+                    c.type = "Int";
                     break;
                 case UInt8:
                     c.data = readData<uint8_t>(file, rowOffset + column.offset);
+                    c.type = "Unsigned Int";
                     break;
                 case Int16:
                     c.data = readData<int16_t>(file, rowOffset + column.offset);
+                    c.type = "Int";
                     break;
                 case UInt16:
                     c.data = readData<uint16_t>(file, rowOffset + column.offset);
+                    c.type = "Unsigned Int";
                     break;
                 case Int32:
                     c.data = readData<int32_t>(file, rowOffset + column.offset);
+                    c.type = "Int";
                     break;
                 case UInt32:
                     c.data = readData<uint32_t>(file, rowOffset + column.offset);
+                    c.type = "Unsigned Int";
                     break;
                 case Float32:
                     c.data = readData<float>(file, rowOffset + column.offset);
+                    c.type = "Float";
                     break;
                 case Int64:
                     c.data = readData<int64_t>(file, rowOffset + column.offset);
+                    c.type = "Int";
                     break;
                 case UInt64:
                     c.data = readData<uint64_t>(file, rowOffset + column.offset);
+                    c.type = "Unsigned Int";
+                    break;
+                case PackedBool0:
+                case PackedBool1:
+                case PackedBool2:
+                case PackedBool3:
+                case PackedBool4:
+                case PackedBool5:
+                case PackedBool6:
+                case PackedBool7: {
+                    int shift = (int)column.type - (int)PackedBool0;
+                    int bit = 1 << shift;
+                    int32_t data = readDataRaw<int32_t>(file, rowOffset + column.offset);
+                    c.data = std::to_string((data & bit) == bit);
+                    c.type = "Boolean";
+                }
                     break;
                 default:
                     c.data = "undefined";
+                    c.type = "Unknown";
                     break;
             }
 
