@@ -18,9 +18,12 @@ EXL readEXL(std::string_view path) {
         const size_t comma = line.find_first_of(',');
 
         std::string name = line.substr(0, comma);
-        std::string id = line.substr(comma + 1, line.length());
 
-        exl.rows.push_back({name, std::stoi(id)});
+        if(name != "EXLT") {
+            std::string id = line.substr(comma + 1, line.length());
+
+            exl.rows.push_back({name, std::stoi(id)});
+        }
     }
 
     return exl;
