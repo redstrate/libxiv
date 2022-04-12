@@ -8,6 +8,7 @@
 #include <string>
 #include <algorithm>
 #include <unordered_map>
+#include <array>
 #include <fmt/printf.h>
 
 // TODO: should be enum?
