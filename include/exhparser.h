@@ -8,7 +8,7 @@
 // taken from https://xiv.dev/game-data/file-formats/excel
 struct ExhHeader {
     char magic[0x4];
-    uint16_t unknown;
+    uint16_t version;
     uint16_t dataOffset;
     uint16_t columnCount;
     uint16_t pageCount;

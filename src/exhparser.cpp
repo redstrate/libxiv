@@ -17,6 +17,8 @@ EXH readEXH(const std::string_view path) {
 
     fread(&exh.header, sizeof(ExhHeader), 1, file);
 
+    fseek(file, 0x20, SEEK_SET);
+
     endianSwap(&exh.header.dataOffset);
     endianSwap(&exh.header.columnCount);
     endianSwap(&exh.header.pageCount);
