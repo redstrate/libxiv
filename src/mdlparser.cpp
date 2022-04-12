@@ -13,7 +13,7 @@ Model parseMDL(const std::string_view path) {
         throw std::runtime_error("Failed to open exh file " + std::string(path));
     }
 
-    enum FileType : int32_t {
+    enum class FileType : int32_t {
         Empty = 1,
         Standard = 2,
         Model = 3,
@@ -297,10 +297,14 @@ Model parseMDL(const std::string_view path) {
 
     fmt::print("Now exporting as test.obj...\n");
 
+    Model model;
+
     // TODO: doesn't work for lod above 0
     for(int i = 0; i < modelHeader.lodCount; i++) {
+        ::Lod lod;
+
         for(int j = lods[i].meshIndex; j < (lods[i].meshIndex + lods[i].meshCount); j++) {
-            std::ofstream out(fmt::format("lod{}_part{}.obj", i, j));
+            Part part;
 
             const VertexDeclaration decl = vertexDecls[j];
 
@@ -370,28 +374,20 @@ Model parseMDL(const std::string_view path) {
                             break;
                     }
                 }
-
-                out << "v " << vertices[k].position[0] << " " << vertices[k].position[1] << " " << vertices[k].position[2] << std::endl;
             }
 
             fseek(file,  modelFileHeader.indexOffsets[i] + (meshes[j].startIndex * 2), SEEK_SET);
             std::vector<uint16_t> indices(meshes[j].indexCount);
             fread(indices.data(), meshes[j].indexCount * sizeof(uint16_t), 1, file);
 
-            for(int k = 0; k < indices.size(); k += 3) {
-                unsigned short x = indices[k + 0] + 1;
-                unsigned short y = indices[k + 1] + 1;
-                unsigned short z = indices[k + 2] + 1;
+            part.indices = indices;
+            part.vertices = vertices;
 
-                out << "f ";
-                out << x << "/" << x << "/" << x << " ";
-                out << y << "/" << y << "/" << y << " ";
-                out << z << "/" << z << "/" << z << std::endl;
-            }
-
-            out.close();
+            lod.parts.push_back(part);
         }
+
+        model.lods.push_back(lod);
     }
 
-    return {};
+    return model;
 }
