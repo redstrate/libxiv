@@ -370,7 +370,10 @@ Model parseMDL(const std::string_view path) {
 
                     switch(usage) {
                         case VertexUsage::Position:
-                            vertices[k].position = floatData;
+                            memcpy(vertices[k].position.data(), floatData.data(), sizeof(float) * 3);
+                            break;
+                        case VertexUsage::Normal:
+                            memcpy(vertices[k].normal.data(), floatData.data(), sizeof(float) * 3);
                             break;
                     }
                 }
