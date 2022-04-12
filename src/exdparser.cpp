@@ -111,8 +111,6 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                                     fread(&byte, sizeof(uint8_t), 1, file);
                                 }
 
-                                fmt::print("read {}\n", string);
-
                                 c.data = string;
                                 c.type = "String";
                             }
@@ -148,10 +146,12 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                             case Int64:
                                 c.data = readData<int64_t>(file, offset + column.offset);
                                 c.type = "Int";
+                                c.uint64Data = readDataRaw<int64_t>(file, offset + column.offset);
                                 break;
                             case UInt64:
                                 c.data = readData<uint64_t>(file, offset + column.offset);
                                 c.type = "Unsigned Int";
+                                c.uint64Data = readDataRaw<uint64_t>(file, offset + column.offset);
                                 break;
                             case PackedBool0:
                             case PackedBool1:

@@ -10,6 +10,7 @@ struct ExcelDataPagination;
 struct Column {
     std::string data;
     std::string type; // for debug
+    int64_t uint64Data = 0;
 };
 
 struct Row {
