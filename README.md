@@ -26,6 +26,7 @@ A modding framework for FFXIV written in C++. This is used in [Novus](https://gi
   * [EXL](include/exlparser.h)
   * [FIIN](include/fiinparser.h)
   * [INDEX/INDEX2](include/indexparser.h)
+  * [MDL](include/mdlparser.h)
 
 ## Dependencies
 **Note:** Some of these dependencies will automatically be downloaded from the Internet if not found

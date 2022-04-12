@@ -88,7 +88,11 @@ int getExpansionID(std::string_view repositoryName) {
 }
 
 std::string GameData::calculateFilename(const int category, const int expansion, const int chunk, const std::string_view platform, const std::string_view type) {
-    return fmt::sprintf("%02x%02x%02x.%s.%s", category, expansion, chunk, platform, type);
+    if(type == "index") {
+        return fmt::sprintf("%02x%02x%02x.%s.%s", category, expansion, chunk, platform, type);
+    } else if(type == "dat") {
+        return fmt::sprintf("%02x%02x00.%s.%s%01x", category, expansion, platform, type, chunk);
+    }
 }
 
 void GameData::extractFile(std::string_view dataFilePath, std::string_view outPath) {
@@ -108,7 +112,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
     for(const auto entry : indexFile.entries) {
         if(entry.hash == hash) {
-            auto dataFilename = calculateFilename(categoryToID[category], getExpansionID(repository), entry.dataFileId, "win32", "dat0");
+            auto dataFilename = calculateFilename(categoryToID[category], getExpansionID(repository), entry.dataFileId, "win32", "dat");
 
             fmt::print("Opening data file {}...\n", dataFilename);
 
@@ -380,29 +384,29 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                 // now write mdl header
                 fseek(newFile, 0, SEEK_SET);
                 fwrite(&modelInfo.version, sizeof(uint32_t), 1, newFile);
-                fwrite(&stackSize, sizeof(int), 1, newFile);
-                fwrite(&runtimeSize, sizeof(int), 1, newFile);
-                fwrite(&modelInfo.vertexDeclarationNum, sizeof(uint16_t), 1, newFile);
-                fwrite(&modelInfo.materialNum, sizeof(uint16_t), 1, newFile);
+                fwrite(&stackSize, sizeof(uint32_t), 1, newFile);
+                fwrite(&runtimeSize, sizeof(uint32_t), 1, newFile);
+                fwrite(&modelInfo.vertexDeclarationNum, sizeof(unsigned short), 1, newFile);
+                fwrite(&modelInfo.materialNum, sizeof(unsigned short), 1, newFile);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&vertexDataOffsets[i], sizeof(int), 1, newFile);
+                    fwrite(&vertexDataOffsets[i], sizeof(uint32_t), 1, newFile);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&indexDataOffsets[i], sizeof(int), 1, newFile);
+                    fwrite(&indexDataOffsets[i], sizeof(uint32_t), 1, newFile);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&vertexDataSizes[i], sizeof(int), 1, newFile);
+                    fwrite(&vertexDataSizes[i], sizeof(uint32_t), 1, newFile);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&indexDataSizes[i], sizeof(int), 1, newFile);
+                    fwrite(&indexDataSizes[i], sizeof(uint32_t), 1, newFile);
 
                 fwrite(&modelInfo.numLods, sizeof(uint8_t), 1, file);
                 fwrite(&modelInfo.indexBufferStreamingEnabled, sizeof(bool), 1, file);
                 fwrite(&modelInfo.edgeGeometryEnabled, sizeof(bool), 1, file);
 
                 uint8_t dummy[] = {0};
-                fwrite(&dummy, sizeof(dummy), 1, file);
+                fwrite(dummy, sizeof(uint8_t), 1, file);
 
                 fmt::print("data size: {}\n", modelInfo.fileSize);
 
