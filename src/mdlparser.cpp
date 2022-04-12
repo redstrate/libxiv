@@ -403,11 +403,9 @@ Model parseMDL(const std::string_view path) {
 
                     switch(usage) {
                         case VertexUsage::Position:
-                            fmt::print("position\n");
                             memcpy(vertices[k].position.data(), floatData.data(), sizeof(float) * 3);
                             break;
                         case VertexUsage::Normal:
-                            fmt::print("normal\n");
                             memcpy(vertices[k].normal.data(), floatData.data(), sizeof(float) * 3);
                             break;
                     }
