@@ -7,6 +7,34 @@
 #include <fstream>
 #include <algorithm>
 
+// from lumina.halfextensions
+static float Unpack(ushort value) {
+    uint num3;
+    if ((value & -33792) == 0) {
+        if ((value & 0x3ff) != 0) {
+            auto num2 = 0xfffffff2;
+            auto num = (uint) (value & 0x3ff);
+            while ((num & 0x400) == 0) {
+                num2--;
+                num <<= 1;
+            }
+
+            num &= 0xfffffbff;
+            num3 = ((uint) (value & 0x8000) << 0x10) | ((num2 + 0x7f) << 0x17) | (num << 13);
+        } else {
+            num3 = (uint) ((value & 0x8000) << 0x10);
+        }
+    } else {
+        num3 =
+                (uint)
+                        (((value & 0x8000) << 0x10) |
+                         ((((value >> 10) & 0x1f) - 15 + 0x7f) << 0x17) |
+                         ((value & 0x3ff) << 13));
+    }
+
+    return *(float *) &num3;
+}
+
 Model parseMDL(const std::string_view path) {
     FILE* file = fopen(path.data(), "rb");
     if(file == nullptr) {
@@ -308,11 +336,6 @@ Model parseMDL(const std::string_view path) {
 
             const VertexDeclaration decl = vertexDecls[j];
 
-            std::vector<VertexElement> orderedElements = decl.elements;
-            std::sort(orderedElements.begin(), orderedElements.end(), [](VertexElement a, VertexElement b) {
-                return a.offset > b.offset;
-            });
-
             enum VertexType : uint8_t {
                 Single3 = 2,
                 Single4 = 3,
@@ -337,7 +360,7 @@ Model parseMDL(const std::string_view path) {
             std::vector<Vertex> vertices(vertexCount);
 
             for(int k = 0; k < vertexCount; k++) {
-                for(auto & orderedElement : orderedElements) {
+                for(auto & orderedElement : decl.elements) {
                     VertexType type = (VertexType)orderedElement.type;
                     VertexUsage usage = (VertexUsage)orderedElement.usage;
 
@@ -360,19 +383,31 @@ Model parseMDL(const std::string_view path) {
                         case VertexType::ByteFloat4:
                             fseek(file, sizeof(uint8_t) * 4, SEEK_CUR);
                             break;
-                        case VertexType::Half2:
-                            fseek(file, sizeof(uint16_t) * 2, SEEK_CUR);
+                        case VertexType::Half2: {
+                            uint16_t values[2];
+                            fread(values, sizeof(uint16_t) * 2, 1, file);
+                            floatData[0] = Unpack(values[0]);
+                            floatData[1] = Unpack(values[1]);
+                        }
                             break;
-                        case VertexType::Half4:
-                            fseek(file, sizeof(uint16_t) * 4, SEEK_CUR);
+                        case VertexType::Half4: {
+                            uint16_t values[4];
+                            fread(values, sizeof(uint16_t) * 4, 1, file);
+                            floatData[0] = Unpack(values[0]);
+                            floatData[1] = Unpack(values[1]);
+                            floatData[2] = Unpack(values[2]);
+                            floatData[3] = Unpack(values[3]);
+                        }
                             break;
                     }
 
                     switch(usage) {
                         case VertexUsage::Position:
+                            fmt::print("position\n");
                             memcpy(vertices[k].position.data(), floatData.data(), sizeof(float) * 3);
                             break;
                         case VertexUsage::Normal:
+                            fmt::print("normal\n");
                             memcpy(vertices[k].normal.data(), floatData.data(), sizeof(float) * 3);
                             break;
                     }
