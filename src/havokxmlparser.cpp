@@ -56,6 +56,8 @@ Skeleton parseHavokXML(const std::string_view path) {
     pugi::xpath_node parentNode = doc.select_node("//hkparam[@name=\"parentIndices\"]");
 
     std::string text = parentNode.node().text().as_string();
+    std::replace(text.begin(), text.end(), '\n', ' ');
+    text.erase(std::remove(text.begin(), text.end(), '\t'), text.end());
 
     auto parentIndices = tokenize(text, " ");
 
