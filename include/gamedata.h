@@ -26,6 +26,8 @@ public:
      */
     void extractFile(std::string_view dataFilePath, std::string_view outPath);
 
+    void extractSkeleton();
+
     std::optional<EXH> readExcelSheet(std::string_view name);
 
     std::vector<std::string> getAllSheetNames();

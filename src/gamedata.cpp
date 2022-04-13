@@ -106,7 +106,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
     // TODO: handle platforms other than win32
     auto indexFilename = calculateFilename(categoryToID[category], getExpansionID(repository), 0, "win32", "index");
 
-    fmt::print("calculated index filename: ");
+    fmt::print("calculated index filename: {}\n", indexFilename);
 
     // TODO: handle hashes in index2 files (we can read them but it's not setup yet.)
     auto indexFile = readIndexFile(dataDirectory + "/" + repository + "/" + indexFilename);
@@ -445,4 +445,56 @@ std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
     }
 
     return {};
+}
+
+void GameData::extractSkeleton() {
+    std::string path = fmt::format("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb");
+
+    extractFile(path, "test.skel");
+
+    FILE* file = fopen("test.skel", "rb");
+
+    fseek(file, 0, SEEK_END);
+    size_t end = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    int32_t magic;
+    fread(&magic, sizeof(int32_t), 1, file);
+
+    int32_t format;
+    fread(&format, sizeof(int32_t), 1, file);
+
+    fseek(file, sizeof(uint16_t), SEEK_CUR);
+
+    if(magic != 0x736B6C62)
+        fmt::print("INVALID SKLB magic");
+
+    size_t dataOffset = 0;
+
+    switch(format) {
+        case 0x31323030:
+            fread(&dataOffset, sizeof(int16_t), 1, file);
+            break;
+        case 0x31333030:
+        case 0x31333031:
+            fseek(file, sizeof(uint16_t), SEEK_CUR);
+            fread(&dataOffset, sizeof(int16_t), 1, file);
+            break;
+        default:
+            fmt::print("INVALID SKLB format {}", format);
+            break;
+    }
+
+    fseek(file, dataOffset, SEEK_SET);
+
+    fmt::print("data offset: {}\n", dataOffset);
+
+    std::vector<uint8_t> havokData(end - dataOffset);
+    fread(havokData.data(), havokData.size(), 1, file);
+
+    FILE* newFile = fopen("test.sklb.havok", "wb");
+    fwrite(havokData.data(), havokData.size(), 1, newFile);
+
+    fclose(newFile);
+    fclose(file);
 }
