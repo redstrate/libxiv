@@ -77,3 +77,5 @@ add_library(libxiv STATIC
 target_include_directories(libxiv PUBLIC include PRIVATE src)
 target_link_libraries(libxiv PUBLIC ${LIBRARIES} pugixml)
 target_link_directories(libxiv PUBLIC ${LIB_DIRS})
+target_compile_features(libxiv PUBLIC cxx_std_17)
+set_target_properties(libxiv PROPERTIES CXX_EXTENSIONS OFF)
