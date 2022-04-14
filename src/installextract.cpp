@@ -2,6 +2,7 @@
 
 #ifdef UNSHIELD_SUPPORTED
 #include <cstdio>
+#include <array>
 #include <stdexcept>
 #include <libunshield.h>
 #include <fmt/format.h>
