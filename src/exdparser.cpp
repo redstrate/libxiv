@@ -118,14 +118,17 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                             case Int8:
                                 c.data = readData<int8_t>(file, offset + column.offset);
                                 c.type = "Int";
+                                c.uint64Data = readDataRaw<int8_t>(file, offset + column.offset);
                                 break;
                             case UInt8:
                                 c.data = readData<uint8_t>(file, offset + column.offset);
                                 c.type = "Unsigned Int";
+                                c.uint64Data = readDataRaw<uint8_t>(file, offset + column.offset);
                                 break;
                             case Int16:
                                 c.data = readData<int16_t>(file, offset + column.offset);
                                 c.type = "Int";
+                                c.uint64Data = readDataRaw<int16_t>(file, offset + column.offset);
                                 break;
                             case UInt16:
                                 c.data = readData<uint16_t>(file, offset + column.offset);
@@ -134,6 +137,7 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                             case Int32:
                                 c.data = readData<int32_t>(file, offset + column.offset);
                                 c.type = "Int";
+                                c.uint64Data = readDataRaw<int32_t>(file, offset + column.offset);
                                 break;
                             case UInt32:
                                 c.data = readData<uint32_t>(file, offset + column.offset);
