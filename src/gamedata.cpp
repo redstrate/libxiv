@@ -436,11 +436,14 @@ std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
 
             std::string exhFilename = "exd/" + newFilename + ".exh";
 
-            extractFile(exhFilename, newFilename + ".exh");
+            std::string outPath = newFilename + ".exh";
+            std::replace(outPath.begin(), outPath.end(), '/', '_');
+
+            extractFile(exhFilename, outPath);
 
             fmt::print("Done extracting files, now parsing...\n");
 
-            return readEXH(newFilename + ".exh");
+            return readEXH(outPath);
         }
     }
 
@@ -497,4 +500,12 @@ void GameData::extractSkeleton() {
 
     fclose(newFile);
     fclose(file);
+}
+
+IndexFile<IndexHashTableEntry> GameData::getIndexListing(std::string_view folder) {
+    auto [repository, category] = calculateRepositoryCategory(fmt::format("{}/{}", folder, "a"));
+
+    auto indexFilename = calculateFilename(categoryToID[category], getExpansionID(repository), 0, "win32", "index");
+
+    return readIndexFile(dataDirectory + "/" + repository + "/" + indexFilename);
 }

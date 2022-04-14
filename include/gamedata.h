@@ -5,6 +5,7 @@
 #include <optional>
 #include "exhparser.h"
 #include "exlparser.h"
+#include "indexparser.h"
 
 /*
  * This handles reading/extracting the raw data from game data packs, such as dat0, index and index2 files.
@@ -26,11 +27,18 @@ public:
      */
     void extractFile(std::string_view dataFilePath, std::string_view outPath);
 
+    IndexFile<IndexHashTableEntry> getIndexListing(std::string_view folder);
+
     void extractSkeleton();
 
     std::optional<EXH> readExcelSheet(std::string_view name);
 
     std::vector<std::string> getAllSheetNames();
+
+    /*
+     * Calculates a uint64 hash from a given game path.
+     */
+    uint64_t calculateHash(std::string_view path);
 
 private:
     /*
@@ -43,11 +51,6 @@ private:
      * Returns the repository, category for a given game path - respectively.
      */
     std::tuple<std::string, std::string> calculateRepositoryCategory(std::string_view path);
-
-    /*
-     * Calculates a uint64 hash from a given game path.
-     */
-    uint64_t calculateHash(std::string_view path);
 
     std::string dataDirectory;
 
