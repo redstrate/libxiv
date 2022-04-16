@@ -7,6 +7,9 @@
 #include <fstream>
 #include <algorithm>
 
+using ushort = unsigned short;
+using uint = unsigned int;
+
 // from lumina.halfextensions
 static float Unpack(ushort value) {
     uint num3;

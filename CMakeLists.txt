@@ -9,7 +9,7 @@ if(TARGET fmt::fmt)
 
     set(LIBRARIES fmt::fmt ${LIBRARIES})
 else()
-    message("Using built-in fmt")
+    message("Using downloaded fmt")
 
     FetchContent_Declare(
     fmt
@@ -41,7 +41,7 @@ if(TARGET ZLIB::ZLIB)
 
     set(LIBRARIES ZLIB::ZLIB ${LIBRARIES})
 else()
-    message("Using built-in zlib")
+    message("Using downloaded zlib")
 
     FetchContent_Declare(
             zlib
@@ -61,7 +61,21 @@ else()
     set(LIBRARIES zlibstatic ${LIBRARIES})
 endif()
 
-find_package(pugixml REQUIRED)
+find_package(pugixml QUIET)
+
+if(TARGET pugixml::pugixml)
+    message("Using system library for zlib")
+else()
+    message("Using downloaded pugixml")
+
+    FetchContent_Declare(
+    pugixml
+    GIT_REPOSITORY https://github.com/zeux/pugixml.git
+    GIT_TAG        master
+    )
+
+    FetchContent_MakeAvailable(pugixml)
+endif()
 
 add_library(libxiv STATIC
         src/fiinparser.cpp
