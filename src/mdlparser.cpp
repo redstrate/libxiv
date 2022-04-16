@@ -1,4 +1,5 @@
 #include "mdlparser.h"
+#include "utility.h"
 
 #include <cstdio>
 #include <stdexcept>
@@ -6,37 +7,6 @@
 #include <array>
 #include <fstream>
 #include <algorithm>
-
-using ushort = unsigned short;
-using uint = unsigned int;
-
-// from lumina.halfextensions
-static float Unpack(ushort value) {
-    uint num3;
-    if ((value & -33792) == 0) {
-        if ((value & 0x3ff) != 0) {
-            auto num2 = 0xfffffff2;
-            auto num = (uint) (value & 0x3ff);
-            while ((num & 0x400) == 0) {
-                num2--;
-                num <<= 1;
-            }
-
-            num &= 0xfffffbff;
-            num3 = ((uint) (value & 0x8000) << 0x10) | ((num2 + 0x7f) << 0x17) | (num << 13);
-        } else {
-            num3 = (uint) ((value & 0x8000) << 0x10);
-        }
-    } else {
-        num3 =
-                (uint)
-                        (((value & 0x8000) << 0x10) |
-                         ((((value >> 10) & 0x1f) - 15 + 0x7f) << 0x17) |
-                         ((value & 0x3ff) << 13));
-    }
-
-    return *(float *) &num3;
-}
 
 Model parseMDL(const std::string_view path) {
     FILE* file = fopen(path.data(), "rb");
@@ -384,22 +354,27 @@ Model parseMDL(const std::string_view path) {
                             fseek(file, sizeof(uint8_t) * 4, SEEK_CUR);
                             break;
                         case VertexType::ByteFloat4:
-                            fseek(file, sizeof(uint8_t) * 4, SEEK_CUR);
+                            uint8_t values[4];
+                            fread(values, sizeof(uint8_t) * 4, 1, file);
+                            floatData[0] = byte_to_float(values[0]);
+                            floatData[1] = byte_to_float(values[1]);
+                            floatData[2] = byte_to_float(values[2]);
+                            floatData[3] = byte_to_float(values[3]);
                             break;
                         case VertexType::Half2: {
                             uint16_t values[2];
                             fread(values, sizeof(uint16_t) * 2, 1, file);
-                            floatData[0] = Unpack(values[0]);
-                            floatData[1] = Unpack(values[1]);
+                            floatData[0] = half_to_float(values[0]);
+                            floatData[1] = half_to_float(values[1]);
                         }
                             break;
                         case VertexType::Half4: {
                             uint16_t values[4];
                             fread(values, sizeof(uint16_t) * 4, 1, file);
-                            floatData[0] = Unpack(values[0]);
-                            floatData[1] = Unpack(values[1]);
-                            floatData[2] = Unpack(values[2]);
-                            floatData[3] = Unpack(values[3]);
+                            floatData[0] = half_to_float(values[0]);
+                            floatData[1] = half_to_float(values[1]);
+                            floatData[2] = half_to_float(values[2]);
+                            floatData[3] = half_to_float(values[3]);
                         }
                             break;
                     }
