@@ -27,18 +27,19 @@ struct ExcelDataRowHeader {
 };
 
 template<typename T>
-T readDataRaw(FILE* file, int offset) {
-    fseek(file, offset, SEEK_SET);
+T readDataRaw(MemorySpan& span, int offset) {
+    span.seek(offset, Seek::Set);
 
     T value;
-    fread(&value, sizeof value, 1, file);
+    span.read(&value);
     endianSwap(&value);
+
     return value;
 }
 
 template<typename T>
-std::string readData(FILE* file, int offset) {
-    return std::to_string(readDataRaw<T>(file, offset));
+std::string readData(MemorySpan& span, int offset) {
+    return std::to_string(readDataRaw<T>(span, offset));
 }
 
 std::string getEXDFilename(EXH& exh, std::string_view name, std::string_view lang, ExcelDataPagination& page) {
@@ -49,23 +50,16 @@ std::string getEXDFilename(EXH& exh, std::string_view name, std::string_view lan
     }
 }
 
-EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
+EXD readEXD(EXH& exh, MemorySpan data, ExcelDataPagination& page) {
     EXD exd;
 
-    FILE* file = fopen(path.data(), "rb");
-    if(file == nullptr) {
-        throw std::runtime_error("Failed to open exd file " + std::string(path));
-    }
-
     ExcelDataHeader header;
-    fread(&header, sizeof(ExcelDataHeader), 1, file);
+    data.read(&header);
 
     endianSwap(&header.indexSize);
 
     std::vector<ExcelDataOffset> dataOffsets;
-    dataOffsets.resize(header.indexSize / sizeof(ExcelDataOffset));
-
-    fread(dataOffsets.data(), sizeof(ExcelDataOffset) * dataOffsets.size(), 1, file);
+    data.read_structures(&dataOffsets, header.indexSize / sizeof(ExcelDataOffset));
 
     for(auto& offset : dataOffsets) {
         endianSwap(&offset.offset);
@@ -75,17 +69,17 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
     for(int i = 0; i < exh.header.rowCount; i++) {
         for(auto& offset : dataOffsets) {
             if (offset.rowId == i) {
-                fseek(file, offset.offset, SEEK_SET);
+                data.seek(offset.offset, Seek::Set);
 
                 ExcelDataRowHeader rowHeader;
-                fread(&rowHeader, sizeof(ExcelDataRowHeader), 1, file);
+                data.read(&rowHeader);
 
                 endianSwap(&rowHeader.dataSize);
                 endianSwap(&rowHeader.rowCount);
 
                 const int headerOffset = offset.offset + 6;
 
-                const auto readRow = [&exd, &exh, file, rowHeader](int offset) {
+                const auto readRow = [&exd, &exh, &data, rowHeader](int offset) {
                     Row row;
 
                     for (auto column: exh.columnDefinitions) {
@@ -93,22 +87,22 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
 
                         switch (column.type) {
                             case String: {
-                                fseek(file, offset + column.offset, SEEK_SET);
+                                data.seek(offset + column.offset, Seek::Set);
 
                                 uint32_t stringLength = 0; // this is actually offset?
-                                fread(&stringLength, sizeof(uint32_t), 1, file);
+                                data.read(&stringLength);
 
                                 endianSwap(&stringLength);
 
-                                fseek(file, offset + exh.header.dataOffset + stringLength, SEEK_SET);
+                                data.seek(offset + exh.header.dataOffset + stringLength, Seek::Set);
 
                                 std::string string;
 
                                 uint8_t byte;
-                                fread(&byte, sizeof(uint8_t), 1, file);
+                                data.read(&byte);
                                 while(byte != 0) {
                                     string.push_back(byte);
-                                    fread(&byte, sizeof(uint8_t), 1, file);
+                                    data.read(&byte);
                                 }
 
                                 c.data = string;
@@ -116,46 +110,46 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                             }
                                 break;
                             case Int8:
-                                c.data = readData<int8_t>(file, offset + column.offset);
+                                c.data = readData<int8_t>(data, offset + column.offset);
                                 c.type = "Int";
-                                c.uint64Data = readDataRaw<int8_t>(file, offset + column.offset);
+                                c.uint64Data = readDataRaw<int8_t>(data, offset + column.offset);
                                 break;
                             case UInt8:
-                                c.data = readData<uint8_t>(file, offset + column.offset);
+                                c.data = readData<uint8_t>(data, offset + column.offset);
                                 c.type = "Unsigned Int";
-                                c.uint64Data = readDataRaw<uint8_t>(file, offset + column.offset);
+                                c.uint64Data = readDataRaw<uint8_t>(data, offset + column.offset);
                                 break;
                             case Int16:
-                                c.data = readData<int16_t>(file, offset + column.offset);
+                                c.data = readData<int16_t>(data, offset + column.offset);
                                 c.type = "Int";
-                                c.uint64Data = readDataRaw<int16_t>(file, offset + column.offset);
+                                c.uint64Data = readDataRaw<int16_t>(data, offset + column.offset);
                                 break;
                             case UInt16:
-                                c.data = readData<uint16_t>(file, offset + column.offset);
+                                c.data = readData<uint16_t>(data, offset + column.offset);
                                 c.type = "Unsigned Int";
                                 break;
                             case Int32:
-                                c.data = readData<int32_t>(file, offset + column.offset);
+                                c.data = readData<int32_t>(data, offset + column.offset);
                                 c.type = "Int";
-                                c.uint64Data = readDataRaw<int32_t>(file, offset + column.offset);
+                                c.uint64Data = readDataRaw<int32_t>(data, offset + column.offset);
                                 break;
                             case UInt32:
-                                c.data = readData<uint32_t>(file, offset + column.offset);
+                                c.data = readData<uint32_t>(data, offset + column.offset);
                                 c.type = "Unsigned Int";
                                 break;
                             case Float32:
-                                c.data = readData<float>(file, offset + column.offset);
+                                c.data = readData<float>(data, offset + column.offset);
                                 c.type = "Float";
                                 break;
                             case Int64:
-                                c.data = readData<int64_t>(file, offset + column.offset);
+                                c.data = readData<int64_t>(data, offset + column.offset);
                                 c.type = "Int";
-                                c.uint64Data = readDataRaw<int64_t>(file, offset + column.offset);
+                                c.uint64Data = readDataRaw<int64_t>(data, offset + column.offset);
                                 break;
                             case UInt64:
-                                c.data = readData<uint64_t>(file, offset + column.offset);
+                                c.data = readData<uint64_t>(data, offset + column.offset);
                                 c.type = "Unsigned Int";
-                                c.uint64Data = readDataRaw<uint64_t>(file, offset + column.offset);
+                                c.uint64Data = readDataRaw<uint64_t>(data, offset + column.offset);
                                 break;
                             case PackedBool0:
                             case PackedBool1:
@@ -167,8 +161,8 @@ EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page) {
                             case PackedBool7: {
                                 int shift = (int) column.type - (int) PackedBool0;
                                 int bit = 1 << shift;
-                                int32_t data = readDataRaw<int32_t>(file, offset + column.offset);
-                                c.data = std::to_string((data & bit) == bit);
+                                int32_t boolData = readDataRaw<int32_t>(data, offset + column.offset);
+                                c.data = std::to_string((boolData & bit) == bit);
                                 c.type = "Boolean";
                             }
                                 break;

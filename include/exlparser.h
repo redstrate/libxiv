@@ -3,6 +3,7 @@
 #include <string_view>
 #include <vector>
 #include <string>
+#include "memorybuffer.h"
 
 struct EXLRow {
     std::string name;
@@ -13,4 +14,4 @@ struct EXL {
     std::vector<EXLRow> rows;
 };
 
-EXL readEXL(std::string_view path);
+EXL readEXL(MemorySpan data);

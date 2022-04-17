@@ -49,9 +49,8 @@ GameData::GameData(const std::string_view dataDirectory) {
         repositories.push_back(repository);
     }
 
-    extractFile("exd/root.exl", "root.exl");
-
-    rootEXL = readEXL("root.exl");
+    auto root_exl_data = extractFile("exd/root.exl");
+    rootEXL = readEXL(*root_exl_data);
 }
 
 std::vector<std::string> GameData::getAllSheetNames() {
@@ -96,9 +95,9 @@ std::tuple<Repository, std::string> GameData::calculateRepositoryCategory(std::s
     return {getBaseRepository(), tokens[0]};
 }
 
-void GameData::extractFile(std::string_view dataFilePath, std::string_view outPath) {
-    const uint64_t hash = calculateHash(dataFilePath);
-    auto [repository, category] = calculateRepositoryCategory(dataFilePath);
+std::optional<MemoryBuffer> GameData::extractFile(const std::string_view data_file_path) {
+    const uint64_t hash = calculateHash(data_file_path);
+    auto [repository, category] = calculateRepositoryCategory(data_file_path);
 
     auto [index_filename, index2_filename] = repository.get_index_filenames(categoryToID[category]);
     auto index_path = fmt::format("{data_directory}/{repository}/{filename}",
@@ -160,11 +159,9 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                 fclose(file);
 
-                FILE* newFile = fopen(outPath.data(), "w");
-                fwrite(data.data(), data.size(), 1, newFile);
-                fclose(newFile);
+                return {data};
             } else if(info.fileType == FileType::Model) {
-                FILE* newFile = fopen(outPath.data(), "w");
+                MemoryBuffer buffer;
 
                 // reset
                 fseek(file, offset, SEEK_SET);
@@ -223,49 +220,54 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                 std::vector<uint16_t> compressedBlockSizes(totalBlocks);
                 fread(compressedBlockSizes.data(), compressedBlockSizes.size() * sizeof(uint16_t), 1, file);
+
                 int currentBlock = 0;
-                int stackSize = 0;
-                int runtimeSize = 0;
+                uint32_t stackSize = 0;
+                uint32_t runtimeSize = 0;
 
-                std::array<int, 3> vertexDataOffsets;
-                std::array<int, 3> indexDataOffsets;
+                std::array<uint32_t, 3> vertexDataOffsets;
+                std::array<uint32_t, 3> indexDataOffsets;
 
-                std::array<int, 3> vertexDataSizes;
-                std::array<int, 3> indexDataSizes;
+                std::array<uint32_t, 3> vertexDataSizes;
+                std::array<uint32_t, 3> indexDataSizes;
 
                 // data.append 0x44
-                fseek(newFile, 0x44, SEEK_SET);
+                buffer.seek(0x44, Seek::Set);
 
                 fseek(file, baseOffset + modelInfo.stackOffset, SEEK_SET);
-                size_t stackStart = ftell(newFile);
+                size_t stackStart = buffer.current_position();
                 for(int i = 0; i < modelInfo.stackBlockNum; i++) {
                     size_t lastPos = ftell(file);
+
                     auto data = read_data_block(file, lastPos);
-                    fwrite(data.data(), data.size(), 1, newFile); // i think we write this to file?
+                    buffer.write(data);
+
                     fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
                     currentBlock++;
                 }
 
-                size_t stackEnd = ftell(newFile);
+                size_t stackEnd = buffer.current_position();
                 stackSize = (int)(stackEnd - stackStart);
 
                 fseek(file, baseOffset + modelInfo.runtimeOffset, SEEK_SET);
-                size_t runtimeStart = ftell(newFile);
+                size_t runtimeStart = buffer.current_position();
                 for(int i = 0; i < modelInfo.runtimeBlockNum; i++) {
                     size_t lastPos = ftell(file);
+
                     auto data = read_data_block(file, lastPos);
-                    fwrite(data.data(), data.size(), 1, newFile);
+                    buffer.write(data);
+
                     fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
                     currentBlock++;
                 }
 
-                size_t runtimeEnd = ftell(newFile);
+                size_t runtimeEnd = buffer.current_position();
                 runtimeSize = (int)(runtimeEnd - runtimeStart);
 
                 // process all 3 lods
                 for(int i = 0; i < 3; i++) {
                     if(modelInfo.vertexBlockBufferBlockNum[i] != 0) {
-                        int currentVertexOffset = ftell(newFile);
+                        int currentVertexOffset = buffer.current_position();
                         if(i == 0 || currentVertexOffset != vertexDataOffsets[i - 1])
                             vertexDataOffsets[i] = currentVertexOffset;
                         else
@@ -275,8 +277,10 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                         for(int j = 0; j < modelInfo.vertexBlockBufferBlockNum[i]; j++) {
                             size_t lastPos = ftell(file);
+
                             auto data = read_data_block(file, lastPos);
-                            fwrite(data.data(), data.size(), 1, newFile); // i think we write this to file?
+                            buffer.write(data);
+
                             vertexDataSizes[i] += (int)data.size();
                             fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
                             currentBlock++;
@@ -286,7 +290,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                     // TODO: lol no edge geometry
 
                     if(modelInfo.indexBufferBlockNum[i] != 0) {
-                        int currentIndexOffset = ftell(newFile);
+                        int currentIndexOffset = buffer.current_position();
                         if(i == 0 || currentIndexOffset != indexDataOffsets[i - 1])
                             indexDataOffsets[i] = currentIndexOffset;
                         else
@@ -294,8 +298,10 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                         for(int j = 0; j < modelInfo.indexBufferBlockNum[i]; j++) {
                             size_t lastPos = ftell(file);
+
                             auto data = read_data_block(file, lastPos);
-                            fwrite(data.data(), data.size(), 1, newFile); // i think we write this to file?
+                            buffer.write(data);
+
                             indexDataSizes[i] += (int)data.size();
                             fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
                             currentBlock++;
@@ -304,45 +310,43 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                 }
 
                 // now write mdl header
-                fseek(newFile, 0, SEEK_SET);
-                fwrite(&modelInfo.version, sizeof(uint32_t), 1, newFile);
-                fwrite(&stackSize, sizeof(uint32_t), 1, newFile);
-                fwrite(&runtimeSize, sizeof(uint32_t), 1, newFile);
-                fwrite(&modelInfo.vertexDeclarationNum, sizeof(unsigned short), 1, newFile);
-                fwrite(&modelInfo.materialNum, sizeof(unsigned short), 1, newFile);
+                buffer.seek(0, Seek::Set);
+
+                buffer.write(modelInfo.version);
+                buffer.write(stackSize);
+                buffer.write(runtimeSize);
+                buffer.write(modelInfo.vertexDeclarationNum);
+                buffer.write(modelInfo.materialNum);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&vertexDataOffsets[i], sizeof(uint32_t), 1, newFile);
+                    buffer.write(vertexDataOffsets[i]);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&indexDataOffsets[i], sizeof(uint32_t), 1, newFile);
+                    buffer.write(indexDataOffsets[i]);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&vertexDataSizes[i], sizeof(uint32_t), 1, newFile);
+                    buffer.write(vertexDataSizes[i]);
 
                 for(int i = 0; i < 3; i++)
-                    fwrite(&indexDataSizes[i], sizeof(uint32_t), 1, newFile);
+                    buffer.write(indexDataSizes[i]);
 
-                fwrite(&modelInfo.numLods, sizeof(uint8_t), 1, file);
-                fwrite(&modelInfo.indexBufferStreamingEnabled, sizeof(bool), 1, file);
-                fwrite(&modelInfo.edgeGeometryEnabled, sizeof(bool), 1, file);
+                buffer.write(modelInfo.numLods);
+                buffer.write(modelInfo.indexBufferStreamingEnabled);
+                buffer.write(modelInfo.edgeGeometryEnabled);
 
-                uint8_t dummy[] = {0};
-                fwrite(dummy, sizeof(uint8_t), 1, file);
+                uint8_t dummy = 0;
+                buffer.write(dummy);
 
-                fclose(newFile);
                 fclose(file);
+
+                return {buffer};
             } else {
-                throw std::runtime_error("File type is not handled yet for " + std::string(dataFilePath));
+                throw std::runtime_error("File type is not handled yet for " + std::string(data_file_path));
             }
-
-            fmt::print("Extracted {} to {}!\n", dataFilePath, outPath);
-
-            return;
         }
     }
 
-    fmt::print("Failed to find file {}.\n", dataFilePath);
+    fmt::print("Failed to find file {}.\n", data_file_path);
 }
 
 std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
@@ -358,9 +362,8 @@ std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
             std::string outPath = newFilename + ".exh";
             std::replace(outPath.begin(), outPath.end(), '/', '_');
 
-            extractFile(exhFilename, outPath);
-
-            return readEXH(outPath);
+            auto exh_data = extractFile(exhFilename);
+            return readEXH(*exh_data);
         }
     }
 
@@ -368,53 +371,45 @@ std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
 }
 
 void GameData::extractSkeleton() {
-    std::string path = fmt::format("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb");
-
-    extractFile(path, "test.skel");
-
-    FILE* file = fopen("test.skel", "rb");
-
-    fseek(file, 0, SEEK_END);
-    size_t end = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    const std::string path = fmt::format("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb");
+    auto skel_data = extractFile(path);
+    auto skel_span = MemorySpan(*skel_data);
 
     int32_t magic;
-    fread(&magic, sizeof(int32_t), 1, file);
-
-    int32_t format;
-    fread(&format, sizeof(int32_t), 1, file);
-
-    fseek(file, sizeof(uint16_t), SEEK_CUR);
+    skel_span.read(&magic);
 
     if(magic != 0x736B6C62)
         fmt::print("INVALID SKLB magic");
 
-    size_t dataOffset = 0;
+    int32_t format;
+    skel_span.read(&format);
 
+    skel_span.seek(sizeof(uint16_t), Seek::Current);
+
+    int16_t dataOffset = 0;
     switch(format) {
         case 0x31323030:
-            fread(&dataOffset, sizeof(int16_t), 1, file);
+            skel_span.read(&dataOffset);
             break;
         case 0x31333030:
         case 0x31333031:
-            fseek(file, sizeof(uint16_t), SEEK_CUR);
-            fread(&dataOffset, sizeof(int16_t), 1, file);
+            skel_span.seek(sizeof(uint16_t), Seek::Current);
+            skel_span.read(&dataOffset);
             break;
         default:
             fmt::print("INVALID SKLB format {}", format);
             break;
     }
 
-    fseek(file, dataOffset, SEEK_SET);
+    skel_span.seek(dataOffset, Seek::Set);
 
-    std::vector<uint8_t> havokData(end - dataOffset);
-    fread(havokData.data(), havokData.size(), 1, file);
+    std::vector<uint8_t> havokData(skel_span.size() - dataOffset);
+    skel_span.read_structures(&havokData, havokData.size());
 
     FILE* newFile = fopen("test.sklb.havok", "wb");
     fwrite(havokData.data(), havokData.size(), 1, newFile);
 
     fclose(newFile);
-    fclose(file);
 }
 
 IndexFile<IndexHashTableEntry> GameData::getIndexListing(std::string_view folder) {

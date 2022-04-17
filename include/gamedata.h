@@ -7,6 +7,7 @@
 #include "exlparser.h"
 #include "indexparser.h"
 #include "sqpack.h"
+#include "memorybuffer.h"
 
 /*
  * This handles reading/extracting the raw data from game data packs, such as dat0, index and index2 files.
@@ -26,7 +27,8 @@ public:
     /*
      * This extracts the raw file from dataFilePath to outPath;
      */
-    void extractFile(std::string_view dataFilePath, std::string_view outPath);
+    [[nodiscard]]
+    std::optional<MemoryBuffer> extractFile(std::string_view data_file_path);
 
     IndexFile<IndexHashTableEntry> getIndexListing(std::string_view folder);
 

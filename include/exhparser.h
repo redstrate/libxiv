@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "language.h"
+#include "memorybuffer.h"
 
 // taken from https://xiv.dev/game-data/file-formats/excel
 struct ExhHeader {
@@ -63,4 +64,4 @@ struct EXH {
     std::vector<Language> language;
 };
 
-EXH readEXH(std::string_view path);
+EXH readEXH(MemorySpan data);

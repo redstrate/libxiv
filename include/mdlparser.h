@@ -4,6 +4,8 @@
 #include <vector>
 #include <array>
 
+#include "memorybuffer.h"
+
 struct Vertex {
     std::array<float, 3> position;
     std::array<float, 3> normal;
@@ -22,4 +24,4 @@ struct Model {
     std::vector<Lod> lods;
 };
 
-Model parseMDL(const std::string_view path);
+Model parseMDL(MemorySpan data);

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "memorybuffer.h"
+
 struct EXH;
 struct ExcelDataPagination;
 
@@ -23,4 +25,4 @@ struct EXD {
 
 std::string getEXDFilename(EXH& exh, std::string_view name, std::string_view lang, ExcelDataPagination& page);
 
-EXD readEXD(EXH& exh, std::string_view path, ExcelDataPagination& page);
+EXD readEXD(EXH& exh, MemorySpan data, ExcelDataPagination& page);

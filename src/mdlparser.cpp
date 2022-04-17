@@ -8,19 +8,7 @@
 #include <fstream>
 #include <algorithm>
 
-Model parseMDL(const std::string_view path) {
-    FILE* file = fopen(path.data(), "rb");
-    if(file == nullptr) {
-        throw std::runtime_error("Failed to open exh file " + std::string(path));
-    }
-
-    enum class FileType : int32_t {
-        Empty = 1,
-        Standard = 2,
-        Model = 3,
-        Texture = 4
-    };
-
+Model parseMDL(MemorySpan data) {
     struct ModelFileHeader {
         uint32_t version;
         uint32_t stackSize;
@@ -37,9 +25,7 @@ Model parseMDL(const std::string_view path) {
         uint8_t padding;
     } modelFileHeader;
 
-    fread(&modelFileHeader, sizeof(ModelFileHeader), 1, file);
-
-    fmt::print("stack size: {}\n", modelFileHeader.stackSize);
+    data.read(&modelFileHeader);
 
     struct VertexElement {
         uint8_t stream, offset, type, usage, usageIndex;
@@ -53,29 +39,28 @@ Model parseMDL(const std::string_view path) {
     std::vector<VertexDeclaration> vertexDecls(modelFileHeader.vertexDeclarationCount);
     for(int i = 0; i < modelFileHeader.vertexDeclarationCount; i++) {
         VertexElement element {};
-        fread(&element, sizeof(VertexElement), 1, file);
+        data.read(&element);
+
         do {
             vertexDecls[i].elements.push_back(element);
-            fread(&element, sizeof(VertexElement), 1, file);
+            data.read(&element);
         } while (element.stream != 255);
 
         int toSeek = 17 * 8 - (vertexDecls[i].elements.size() + 1) * 8;
-        fseek(file, toSeek, SEEK_CUR);
+        data.seek(toSeek, Seek::Current);
     }
 
     uint16_t stringCount;
-    fread(&stringCount, sizeof(uint16_t), 1, file);
-
-    fmt::print("string count: {}\n", stringCount);
+    data.read(&stringCount);
 
     // dummy
-    fseek(file, sizeof(uint16_t), SEEK_CUR);
+    data.seek(sizeof(uint16_t), Seek::Current);
 
     uint32_t stringSize;
-    fread(&stringSize, sizeof(uint32_t), 1, file);
+    data.read(&stringSize);
 
-    std::vector<uint8_t> strings(stringSize);
-    fread(strings.data(), stringSize, 1, file);
+    std::vector<uint8_t> strings;
+    data.read_structures(&strings, stringSize);
 
     enum ModelFlags1 : uint8_t
     {
@@ -135,28 +120,23 @@ Model parseMDL(const std::string_view path) {
         uint8_t padding[6];
     } modelHeader;
 
-    fread(&modelHeader, sizeof(modelHeader), 1, file);
-
-    fmt::print("mesh count: {}\n", modelHeader.meshCount);
-    fmt::print("attribute count: {}\n", modelHeader.attributeCount);
+    data.read(&modelHeader);
 
     struct ElementId {
-        unsigned int elementId;
-        unsigned int parentBoneName;
+        uint32_t elementId;
+        uint32_t  parentBoneName;
         std::vector<float> translate;
         std::vector<float> rotate;
     };
 
     std::vector<ElementId> elementIds(modelHeader.elementIdCount);
     for(int i = 0; i < modelHeader.elementIdCount; i++) {
-        fread(&elementIds[i].elementId, sizeof(uint32_t), 1, file);
-        fread(&elementIds[i].parentBoneName, sizeof(uint32_t), 1, file);
+        data.read(&elementIds[i].elementId);
+        data.read(&elementIds[i].parentBoneName);
 
-        elementIds[i].translate.resize(3); // FIXME: these always seem to be 3, convert to static array? then we could probably fread this all in one go!
-        elementIds[i].rotate.resize(3);
-
-        fread(elementIds[i].translate.data(), sizeof(float) * 3, 1, file);
-        fread(elementIds[i].rotate.data(), sizeof(float) * 3, 1, file);
+        // FIXME: these always seem to be 3, convert to static array? then we could probably read this all in one go!
+        data.read_structures(&elementIds[i].translate, 3);
+        data.read_structures(&elementIds[i].rotate, 3);
     }
 
     struct Lod {
@@ -184,10 +164,10 @@ Model parseMDL(const std::string_view path) {
         unsigned int indexDataOffset;
     };
 
-    std::array<Lod, 3> lods;
-    fread(lods.data(), sizeof(Lod) * 3, 1, file);
+    std::vector<Lod> lods;
 
     // TODO: support models that support more than 3 lods
+    data.read_structures(&lods, 3);
 
     struct Mesh {
         unsigned short vertexCount;
@@ -199,7 +179,7 @@ Model parseMDL(const std::string_view path) {
         unsigned short boneTableIndex;
         unsigned int startIndex;
 
-        std::vector<unsigned int> vertexBufferOffset;
+        std::vector<uint32_t> vertexBufferOffset;
         std::vector<uint8_t> vertexBufferStride;
 
         uint8_t vertexStreamCount;
@@ -207,26 +187,23 @@ Model parseMDL(const std::string_view path) {
 
     std::vector<Mesh> meshes(modelHeader.meshCount);
     for(int i = 0; i < modelHeader.meshCount; i++) {
-        fread(&meshes[i].vertexCount, sizeof(uint16_t), 1, file);
-        fread(&meshes[i].padding, sizeof(uint16_t), 1, file);
-        fread(&meshes[i].indexCount, sizeof(uint32_t), 1, file);
-        fread(&meshes[i].materialIndex, sizeof(uint16_t), 1, file);
-        fread(&meshes[i].subMeshIndex, sizeof(uint16_t), 1, file);
-        fread(&meshes[i].subMeshCount, sizeof(uint16_t), 1, file);
-        fread(&meshes[i].boneTableIndex, sizeof(uint16_t), 1, file);
-        fread(&meshes[i].startIndex, sizeof(uint32_t), 1, file);
+        data.read(&meshes[i].vertexCount);
+        data.read(&meshes[i].padding);
+        data.read(&meshes[i].indexCount);
+        data.read(&meshes[i].materialIndex);
+        data.read(&meshes[i].subMeshIndex);
+        data.read(&meshes[i].subMeshCount);
+        data.read(&meshes[i].boneTableIndex);
+        data.read(&meshes[i].startIndex);
 
-        meshes[i].vertexBufferOffset.resize(3);
-        fread(meshes[i].vertexBufferOffset.data(), sizeof(uint32_t) * 3, 1, file);
+        data.read_structures(&meshes[i].vertexBufferOffset, 3);
+        data.read_structures(&meshes[i].vertexBufferStride, 3);
 
-        meshes[i].vertexBufferStride.resize(3);
-        fread(meshes[i].vertexBufferStride.data(), sizeof(uint8_t) * 3, 1, file);
-
-        fread(&meshes[i].vertexStreamCount, sizeof(uint8_t), 1, file);
+        data.read(&meshes[i].vertexStreamCount);
     }
 
-    std::vector<uint32_t> attributeNameOffsets(modelHeader.attributeCount);
-    fread(attributeNameOffsets.data(), sizeof(uint32_t) * modelHeader.attributeCount, 1, file);
+    std::vector<uint32_t> attributeNameOffsets;
+    data.read_structures(&attributeNameOffsets, modelHeader.attributeCount);
 
     // TODO: implement terrain shadow meshes
 
@@ -238,69 +215,60 @@ Model parseMDL(const std::string_view path) {
         unsigned short boneCount;
     };
 
-    std::vector<Submesh> submeshes(modelHeader.submeshCount);
-    for(int i = 0; i < modelHeader.submeshCount; i++) {
-        fread(&submeshes[i], sizeof(Submesh), 1, file);
-    }
+    std::vector<Submesh> submeshes;
+    data.read_structures(&submeshes, modelHeader.submeshCount);
 
     // TODO: implement terrain shadow submeshes
 
-    std::vector<uint32_t> materialNameOffsets(modelHeader.materialCount);
-    fread(materialNameOffsets.data(), sizeof(uint32_t) * modelHeader.materialCount, 1, file);
+    std::vector<uint32_t> materialNameOffsets;
+    data.read_structures(&materialNameOffsets, modelHeader.materialCount);
 
-    std::vector<uint32_t> boneNameOffsets(modelHeader.boneCount);
-    fread(boneNameOffsets.data(), sizeof(uint32_t) * modelHeader.boneCount, 1, file);
+    std::vector<uint32_t> boneNameOffsets;
+    data.read_structures(&boneNameOffsets, modelHeader.boneCount);
 
     struct BoneTable {
-        std::vector<unsigned short> boneIndex;
+        std::vector<uint16_t> boneIndex;
         uint8_t boneCount;
         std::vector<uint8_t> padding;
     };
 
     std::vector<BoneTable> boneTables(modelHeader.boneTableCount);
     for(int i = 0; i < modelHeader.boneTableCount; i++) {
-        boneTables[i].boneIndex.resize(64);
-        fread(boneTables[i].boneIndex.data(), 64 * sizeof(uint16_t), 1, file);
-        fread(&boneTables[i].boneCount, sizeof(uint8_t), 1, file);
-        boneTables[i].padding.resize(3);
-        fread(boneTables[i].padding.data(), sizeof(uint8_t) * 3, 1, file);
+        data.read_structures(&boneTables[i].boneIndex, 64);
 
-        fmt::print("bone count: {}\n", boneTables[i].boneCount);
+        data.read(&boneTables[i].boneCount);
+
+        data.read_structures(&boneTables[i].padding, 3);
     }
 
     // TODO: implement shapes
 
-    unsigned int submeshBoneMapSize;
-    fread(&submeshBoneMapSize, sizeof(uint32_t), 1, file);
+    uint32_t submeshBoneMapSize;
+    data.read(&submeshBoneMapSize);
 
-    std::vector<uint16_t > submeshBoneMap((int)submeshBoneMapSize / 2);
-    fread(submeshBoneMap.data(), submeshBoneMap.size() * sizeof(uint16_t), 1, file);
+    std::vector<uint16_t> submeshBoneMap;
+    data.read_structures(&submeshBoneMap, (int)submeshBoneMapSize / 2);
 
     uint8_t paddingAmount;
-    fread(&paddingAmount, sizeof(uint8_t), 1, file);
+    data.read(&paddingAmount);
 
-    fseek(file, paddingAmount, SEEK_CUR);
+    data.seek(paddingAmount, Seek::Current);
 
     struct BoundingBox {
         std::array<float, 4> min, max;
     };
 
     BoundingBox boundingBoxes, modelBoundingBoxes, waterBoundingBoxes, verticalFogBoundingBoxes;
-    fread(&boundingBoxes, sizeof(BoundingBox), 1, file);
-    fread(&modelBoundingBoxes, sizeof(BoundingBox), 1, file);
-    fread(&waterBoundingBoxes, sizeof(BoundingBox), 1, file);
-    fread(&verticalFogBoundingBoxes, sizeof(BoundingBox), 1, file);
+    data.read(&boundingBoxes);
+    data.read(&modelBoundingBoxes);
+    data.read(&waterBoundingBoxes);
+    data.read(&verticalFogBoundingBoxes);
 
-    std::vector<BoundingBox> boneBoundingBoxes(modelHeader.boneCount);
-    fread(boneBoundingBoxes.data(), modelHeader.boneCount * sizeof(BoundingBox), 1, file);
-
-    fmt::print("Successfully read mdl file!\n");
-
-    fmt::print("Now exporting as test.obj...\n");
+    std::vector<BoundingBox> boneBoundingBoxes;
+    data.read_structures(&boneBoundingBoxes, modelHeader.boneCount);
 
     Model model;
 
-    // TODO: doesn't work for lod above 0
     for(int i = 0; i < modelHeader.lodCount; i++) {
         ::Lod lod;
 
@@ -333,44 +301,48 @@ Model parseMDL(const std::string_view path) {
             std::vector<Vertex> vertices(vertexCount);
 
             for(int k = 0; k < vertexCount; k++) {
-                for(auto & orderedElement : decl.elements) {
-                    VertexType type = (VertexType)orderedElement.type;
-                    VertexUsage usage = (VertexUsage)orderedElement.usage;
+                for(auto& orderedElement : decl.elements) {
+                    auto type = static_cast<VertexType>(orderedElement.type);
+                    auto usage = static_cast<VertexUsage>(orderedElement.usage);
 
                     const int stream = orderedElement.stream;
 
-                    fseek(file, lods[i].vertexDataOffset + meshes[j].vertexBufferOffset[stream] + orderedElement.offset + meshes[i].vertexBufferStride[stream] * k, SEEK_SET);
+                    data.seek(lods[i].vertexDataOffset + meshes[j].vertexBufferOffset[stream] + orderedElement.offset + meshes[i].vertexBufferStride[stream] * k, Seek::Set);
 
                     std::array<float, 4> floatData = {};
 
                     switch(type) {
                         case VertexType::Single3:
-                            fread(floatData.data(), sizeof(float) * 3, 1, file);
+                            data.read_array(floatData.data(), 3);
                             break;
                         case VertexType::Single4:
-                            fread(floatData.data(), sizeof(float) * 4, 1, file);
+                            data.read_array(floatData.data(), 4);
                             break;
                         case VertexType::UInt:
-                            fseek(file, sizeof(uint8_t) * 4, SEEK_CUR);
+                            data.seek(sizeof(uint8_t) * 4, Seek::Current);
                             break;
-                        case VertexType::ByteFloat4:
+                        case VertexType::ByteFloat4: {
                             uint8_t values[4];
-                            fread(values, sizeof(uint8_t) * 4, 1, file);
+                            data.read_array(values, 4);
+
                             floatData[0] = byte_to_float(values[0]);
                             floatData[1] = byte_to_float(values[1]);
                             floatData[2] = byte_to_float(values[2]);
                             floatData[3] = byte_to_float(values[3]);
+                        }
                             break;
                         case VertexType::Half2: {
                             uint16_t values[2];
-                            fread(values, sizeof(uint16_t) * 2, 1, file);
+                            data.read_array(values, 2);
+
                             floatData[0] = half_to_float(values[0]);
                             floatData[1] = half_to_float(values[1]);
                         }
                             break;
                         case VertexType::Half4: {
                             uint16_t values[4];
-                            fread(values, sizeof(uint16_t) * 4, 1, file);
+                            data.read_array(values, 4);
+
                             floatData[0] = half_to_float(values[0]);
                             floatData[1] = half_to_float(values[1]);
                             floatData[2] = half_to_float(values[2]);
@@ -390,9 +362,10 @@ Model parseMDL(const std::string_view path) {
                 }
             }
 
-            fseek(file,  modelFileHeader.indexOffsets[i] + (meshes[j].startIndex * 2), SEEK_SET);
-            std::vector<uint16_t> indices(meshes[j].indexCount);
-            fread(indices.data(), meshes[j].indexCount * sizeof(uint16_t), 1, file);
+            data.seek(modelFileHeader.indexOffsets[i] + (meshes[j].startIndex * 2), Seek::Set);
+
+            std::vector<uint16_t> indices;
+            data.read_structures(&indices, meshes[j].indexCount);
 
             part.indices = indices;
             part.vertices = vertices;
