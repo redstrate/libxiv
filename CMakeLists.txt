@@ -89,7 +89,10 @@ add_library(libxiv STATIC
         src/patch.cpp
         src/exlparser.cpp
         src/mdlparser.cpp
-        src/havokxmlparser.cpp)
+        src/havokxmlparser.cpp
+        src/types.cpp
+        src/equipment.cpp
+        src/sqpack.cpp)
 target_include_directories(libxiv PUBLIC include PRIVATE src)
 target_link_libraries(libxiv PUBLIC ${LIBRARIES} pugixml::pugixml)
 target_link_directories(libxiv PUBLIC ${LIB_DIRS})

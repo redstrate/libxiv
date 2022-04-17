@@ -64,3 +64,30 @@ IndexFile<Index2HashTableEntry> readIndex2File(const std::string_view path) {
 
     return index;
 }
+
+CombinedIndexFile read_index_files(std::string_view index_filename, std::string_view index2_filename) {
+    CombinedIndexFile final_index_file;
+
+    auto index_parsed = readIndexFile(index_filename);
+    auto index2_parsed = readIndex2File(index2_filename);
+
+    for(auto entry : index_parsed.entries) {
+        IndexEntry new_entry;
+        new_entry.hash = entry.hash;
+        new_entry.offset = entry.offset;
+        new_entry.dataFileId = entry.dataFileId;
+
+        final_index_file.entries.push_back(new_entry);
+    }
+
+    for(auto entry : index2_parsed.entries) {
+        IndexEntry new_entry;
+        new_entry.hash = entry.hash;
+        new_entry.offset = entry.offset;
+        new_entry.dataFileId = entry.dataFileId;
+
+        final_index_file.entries.push_back(new_entry);
+    }
+
+    return final_index_file;
+}

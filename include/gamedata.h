@@ -6,6 +6,7 @@
 #include "exhparser.h"
 #include "exlparser.h"
 #include "indexparser.h"
+#include "sqpack.h"
 
 /*
  * This handles reading/extracting the raw data from game data packs, such as dat0, index and index2 files.
@@ -41,18 +42,17 @@ public:
     uint64_t calculateHash(std::string_view path);
 
 private:
-    /*
-     * This returns a proper SQEX-style filename for index, index2, and dat files.
-     * filenames are in the format of {category}{expansion}{chunk}.{platform}.{type}
-     */
-    std::string calculateFilename(int category, int expansion, int chunk, std::string_view platform, std::string_view type);
+    Repository& getBaseRepository();
 
     /*
      * Returns the repository, category for a given game path - respectively.
      */
-    std::tuple<std::string, std::string> calculateRepositoryCategory(std::string_view path);
+    std::tuple<Repository, std::string> calculateRepositoryCategory(std::string_view path);
 
     std::string dataDirectory;
+    std::vector<Repository> repositories;
 
     EXL rootEXL;
 };
+
+std::vector<std::uint8_t> read_data_block(FILE* file, size_t starting_position);

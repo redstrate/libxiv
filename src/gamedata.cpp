@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <array>
 #include <fmt/printf.h>
+#include <filesystem>
 
 // TODO: should be enum?
 // taken from https://xiv.dev/data-files/sqpack#categories
@@ -34,6 +35,20 @@ std::unordered_map<std::string_view, int> categoryToID = {
 GameData::GameData(const std::string_view dataDirectory) {
     this->dataDirectory = dataDirectory;
 
+    for(auto const& dir_entry : std::filesystem::directory_iterator{dataDirectory}) {
+        if(!dir_entry.is_directory())
+            continue;
+
+        Repository repository;
+        repository.name = dir_entry.path().filename().string();
+        repository.type = stringContains(repository.name, "ex") ? Repository::Type::Expansion : Repository::Type::Base;
+
+        if(repository.type == Repository::Type::Expansion)
+            repository.expansion_number = std::stoi(repository.name.substr(2));
+
+        repositories.push_back(repository);
+    }
+
     extractFile("exd/root.exl", "root.exl");
 
     rootEXL = readEXL("root.exl");
@@ -42,9 +57,8 @@ GameData::GameData(const std::string_view dataDirectory) {
 std::vector<std::string> GameData::getAllSheetNames() {
     std::vector<std::string> names;
 
-    for(auto row : rootEXL.rows) {
+    for(auto& row : rootEXL.rows)
         names.push_back(row.name);
-    }
 
     return names;
 }
@@ -66,71 +80,49 @@ uint64_t GameData::calculateHash(const std::string_view path) {
     return static_cast<uint64_t>(directoryCrc) << 32 | filenameCrc;
 }
 
-std::tuple<std::string, std::string> GameData::calculateRepositoryCategory(std::string_view path) {
-    std::string repository, category;
+std::tuple<Repository, std::string> GameData::calculateRepositoryCategory(std::string_view path) {
+    const auto tokens = tokenize(path, "/");
+    const std::string repositoryToken = tokens[0];
 
-    auto tokens = tokenize(path, "/");
-    if(stringContains(tokens[1], "ex") && !stringContains(tokens[0], "exd") && !stringContains(tokens[0], "exh")) {
-        repository = tokens[1];
-    } else {
-        repository = "ffxiv";
+    for(auto& repository : repositories) {
+        if(repository.name == repositoryToken) {
+            // if this is an expansion, the next token is the category
+            return {repository, tokens[1]};
+        }
     }
 
-    category = tokens[0];
-
-    return {repository, category};
-}
-
-int getExpansionID(std::string_view repositoryName) {
-    if(repositoryName == "ffxiv")
-        return 0;
-
-    return std::stoi(std::string(repositoryName.substr(2, 2)));
-}
-
-std::string GameData::calculateFilename(const int category, const int expansion, const int chunk, const std::string_view platform, const std::string_view type) {
-    if(type == "index") {
-        return fmt::sprintf("%02x%02x%02x.%s.%s", category, expansion, chunk, platform, type);
-    } else if(type == "dat") {
-        return fmt::sprintf("%02x%02x00.%s.%s%01x", category, expansion, platform, type, chunk);
-    }
+    // if it doesn't match any existing repositories (in the case of accessing base game data),
+    // fall back to base repository.
+    return {getBaseRepository(), tokens[0]};
 }
 
 void GameData::extractFile(std::string_view dataFilePath, std::string_view outPath) {
     const uint64_t hash = calculateHash(dataFilePath);
     auto [repository, category] = calculateRepositoryCategory(dataFilePath);
 
-    fmt::print("repository = {}\n", repository);
-    fmt::print("category = {}\n", category);
+    auto [index_filename, index2_filename] = repository.get_index_filenames(categoryToID[category]);
+    auto index_path = fmt::format("{data_directory}/{repository}/{filename}",
+                                  fmt::arg("data_directory", dataDirectory),
+                                  fmt::arg("repository", repository.name),
+                                  fmt::arg("filename", index_filename));
+    auto index2_path = fmt::format("{data_directory}/{repository}/{filename}",
+                                  fmt::arg("data_directory", dataDirectory),
+                                  fmt::arg("repository", repository.name),
+                                  fmt::arg("filename", index2_filename));
 
-    // TODO: handle platforms other than win32
-    auto indexFilename = calculateFilename(categoryToID[category], getExpansionID(repository), 0, "win32", "index");
+    auto index_file = read_index_files(index_path, index2_path);
 
-    fmt::print("calculated index filename: {}\n", indexFilename);
-
-    // TODO: handle hashes in index2 files (we can read them but it's not setup yet.)
-    auto indexFile = readIndexFile(dataDirectory + "/" + repository + "/" + indexFilename);
-
-    for(const auto entry : indexFile.entries) {
+    for(const auto entry : index_file.entries) {
         if(entry.hash == hash) {
-            auto dataFilename = calculateFilename(categoryToID[category], getExpansionID(repository), entry.dataFileId, "win32", "dat");
+            auto data_filename = repository.get_dat_filename(categoryToID[category], entry.dataFileId);
 
-            fmt::print("Opening data file {}...\n", dataFilename);
-
-            FILE* file = fopen((dataDirectory + "/" + repository + "/" + dataFilename).c_str(), "rb");
+            FILE* file = fopen((dataDirectory + "/" + repository.name + "/" + data_filename).c_str(), "rb");
             if(file == nullptr) {
-                throw std::runtime_error("Failed to open data file: " + dataFilename);
+                throw std::runtime_error("Failed to open data file: " + data_filename);
             }
 
             const size_t offset = entry.offset * 0x80;
             fseek(file, offset, SEEK_SET);
-
-            enum FileType : int32_t {
-                Empty = 1,
-                Standard = 2,
-                Model = 3,
-                Texture = 4
-            };
 
             struct FileInfo {
                 uint32_t size;
@@ -142,47 +134,10 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
             fread(&info, sizeof(FileInfo), 1, file);
 
-            fmt::print("file size = {}\n", info.fileSize);
-
             struct Block {
                 int32_t offset;
                 int16_t dummy;
                 int16_t dummy2;
-            };
-
-            const auto readFileBlock = [](FILE* file, size_t startingPos) -> std::vector<std::uint8_t> {
-                struct BlockHeader {
-                    int32_t size;
-                    int32_t dummy;
-                    int32_t compressedLength; // < 32000 is uncompressed data
-                    int32_t decompressedLength;
-                } header;
-
-                fseek(file, startingPos, SEEK_SET);
-
-                fread(&header, sizeof(BlockHeader), 1, file);
-
-                std::vector<uint8_t> localdata;
-
-                bool isCompressed = header.compressedLength < 32000;
-                if(isCompressed) {
-                    localdata.resize(header.decompressedLength);
-
-                    std::vector<uint8_t> compressed_data;
-                    compressed_data.resize(header.compressedLength);
-                    fread(compressed_data.data(), header.compressedLength, 1, file);
-
-                    zlib::no_header_decompress(reinterpret_cast<uint8_t*>(compressed_data.data()),
-                                               compressed_data.size(),
-                                               reinterpret_cast<uint8_t*>(localdata.data()),
-                                               header.decompressedLength);
-                } else {
-                    localdata.resize(header.decompressedLength);
-
-                    fread(localdata.data(), header.decompressedLength, 1, file);
-                }
-
-                return localdata;
             };
 
             if(info.fileType == FileType::Standard) {
@@ -199,37 +154,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                 const size_t startingPos = offset + info.size;
                 for(auto block : blocks) {
-                    struct BlockHeader {
-                        int32_t size;
-                        int32_t dummy;
-                        int32_t compressedLength; // < 32000 is uncompressed data
-                        int32_t decompressedLength;
-                    } header;
-
-                    fseek(file, startingPos + block.offset, SEEK_SET);
-
-                    fread(&header, sizeof(BlockHeader), 1, file);
-
-                    std::vector<uint8_t> localdata;
-
-                    bool isCompressed = header.compressedLength < 32000;
-                    if(isCompressed) {
-                        localdata.resize(header.decompressedLength);
-
-                        std::vector<uint8_t> compressed_data;
-                        compressed_data.resize(header.compressedLength);
-                        fread(compressed_data.data(), header.compressedLength, 1, file);
-
-                        zlib::no_header_decompress(reinterpret_cast<uint8_t*>(compressed_data.data()),
-                                                   compressed_data.size(),
-                                                   reinterpret_cast<uint8_t*>(localdata.data()),
-                                                   header.decompressedLength);
-                    } else {
-                        localdata.resize(header.decompressedLength);
-
-                        fread(localdata.data(), header.decompressedLength, 1, file);
-                    }
-
+                    auto localdata = read_data_block(file, startingPos + block.offset);
                     data.insert(data.end(), localdata.begin(), localdata.end());
                 }
 
@@ -238,7 +163,6 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                 FILE* newFile = fopen(outPath.data(), "w");
                 fwrite(data.data(), data.size(), 1, newFile);
                 fclose(newFile);
-
             } else if(info.fileType == FileType::Model) {
                 FILE* newFile = fopen(outPath.data(), "w");
 
@@ -316,7 +240,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                 size_t stackStart = ftell(newFile);
                 for(int i = 0; i < modelInfo.stackBlockNum; i++) {
                     size_t lastPos = ftell(file);
-                    auto data = readFileBlock(file, lastPos);
+                    auto data = read_data_block(file, lastPos);
                     fwrite(data.data(), data.size(), 1, newFile); // i think we write this to file?
                     fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
                     currentBlock++;
@@ -329,7 +253,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                 size_t runtimeStart = ftell(newFile);
                 for(int i = 0; i < modelInfo.runtimeBlockNum; i++) {
                     size_t lastPos = ftell(file);
-                    auto data = readFileBlock(file, lastPos);
+                    auto data = read_data_block(file, lastPos);
                     fwrite(data.data(), data.size(), 1, newFile);
                     fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
                     currentBlock++;
@@ -337,9 +261,6 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                 size_t runtimeEnd = ftell(newFile);
                 runtimeSize = (int)(runtimeEnd - runtimeStart);
-
-                fmt::print("stack size: {}\n", stackSize);
-                fmt::print("runtime size: {}\n", runtimeSize);
 
                 // process all 3 lods
                 for(int i = 0; i < 3; i++) {
@@ -354,7 +275,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                         for(int j = 0; j < modelInfo.vertexBlockBufferBlockNum[i]; j++) {
                             size_t lastPos = ftell(file);
-                            auto data = readFileBlock(file, lastPos);
+                            auto data = read_data_block(file, lastPos);
                             fwrite(data.data(), data.size(), 1, newFile); // i think we write this to file?
                             vertexDataSizes[i] += (int)data.size();
                             fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
@@ -373,7 +294,7 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
 
                         for(int j = 0; j < modelInfo.indexBufferBlockNum[i]; j++) {
                             size_t lastPos = ftell(file);
-                            auto data = readFileBlock(file, lastPos);
+                            auto data = read_data_block(file, lastPos);
                             fwrite(data.data(), data.size(), 1, newFile); // i think we write this to file?
                             indexDataSizes[i] += (int)data.size();
                             fseek(file, lastPos + compressedBlockSizes[currentBlock], SEEK_SET);
@@ -409,26 +330,24 @@ void GameData::extractFile(std::string_view dataFilePath, std::string_view outPa
                 uint8_t dummy[] = {0};
                 fwrite(dummy, sizeof(uint8_t), 1, file);
 
-                fmt::print("data size: {}\n", modelInfo.fileSize);
-
                 fclose(newFile);
                 fclose(file);
             } else {
                 throw std::runtime_error("File type is not handled yet for " + std::string(dataFilePath));
             }
+
+            fmt::print("Extracted {} to {}!\n", dataFilePath, outPath);
+
+            return;
         }
     }
 
-    fmt::print("Extracted {} to {}\n", dataFilePath, outPath);
+    fmt::print("Failed to find file {}.\n", dataFilePath);
 }
 
 std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
-    fmt::print("Beginning to read excel sheet {}...\n", name);
-
-    for(auto row : rootEXL.rows) {
+    for(const auto& row : rootEXL.rows) {
         if(row.name == name) {
-            fmt::print("Found row {} at id {}!\n", name, row.id);
-
             // we want it as lowercase (Item -> item)
             std::string newFilename = name.data();
             std::transform(newFilename.begin(), newFilename.end(), newFilename.begin(),
@@ -440,8 +359,6 @@ std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
             std::replace(outPath.begin(), outPath.end(), '/', '_');
 
             extractFile(exhFilename, outPath);
-
-            fmt::print("Done extracting files, now parsing...\n");
 
             return readEXH(outPath);
         }
@@ -490,8 +407,6 @@ void GameData::extractSkeleton() {
 
     fseek(file, dataOffset, SEEK_SET);
 
-    fmt::print("data offset: {}\n", dataOffset);
-
     std::vector<uint8_t> havokData(end - dataOffset);
     fread(havokData.data(), havokData.size(), 1, file);
 
@@ -505,7 +420,16 @@ void GameData::extractSkeleton() {
 IndexFile<IndexHashTableEntry> GameData::getIndexListing(std::string_view folder) {
     auto [repository, category] = calculateRepositoryCategory(fmt::format("{}/{}", folder, "a"));
 
-    auto indexFilename = calculateFilename(categoryToID[category], getExpansionID(repository), 0, "win32", "index");
+    auto [indexFilename, index2Filename] = repository.get_index_filenames(categoryToID[category]);
 
-    return readIndexFile(dataDirectory + "/" + repository + "/" + indexFilename);
+    return readIndexFile(dataDirectory + "/" + repository.name + "/" + indexFilename);
+}
+
+Repository& GameData::getBaseRepository() {
+    for(auto& repository : repositories) {
+        if(repository.type == Repository::Type::Base)
+            return repository;
+    }
+
+    throw std::runtime_error("No base repository found.");
 }

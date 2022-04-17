@@ -58,5 +58,17 @@ struct IndexFile {
     std::vector<Entry> entries;
 };
 
-IndexFile<IndexHashTableEntry> readIndexFile(const std::string_view path);
-IndexFile<Index2HashTableEntry> readIndex2File(const std::string_view path);
+struct IndexEntry {
+    uint64_t hash = 0;
+    uint32_t dataFileId = 0;
+    uint32_t offset = 0;
+};
+
+struct CombinedIndexFile {
+    std::vector<IndexEntry> entries;
+};
+
+IndexFile<IndexHashTableEntry> readIndexFile(std::string_view path);
+IndexFile<Index2HashTableEntry> readIndex2File(std::string_view path);
+
+CombinedIndexFile read_index_files(std::string_view index_filename, std::string_view index2_filename);
