@@ -8,29 +8,177 @@
 #include <fstream>
 #include <algorithm>
 
+struct ModelFileHeader {
+    uint32_t version;
+    uint32_t stackSize;
+    uint32_t runtimeSize;
+    unsigned short vertexDeclarationCount;
+    unsigned short materialCount;
+    uint32_t vertexOffsets[3];
+    uint32_t indexOffsets[3];
+    uint32_t vertexBufferSize[3];
+    uint32_t indexBufferSize[3];
+    uint8_t lodCount;
+    bool indexBufferStreamingEnabled;
+    bool hasEdgeGeometry;
+    uint8_t padding;
+};
+
+enum VertexType : uint8_t {
+    Single3 = 2,
+    Single4 = 3,
+    UInt = 5,
+    ByteFloat4 = 8,
+    Half2 = 13,
+    Half4 = 14
+};
+
+enum VertexUsage : uint8_t  {
+    Position = 0,
+    BlendWeights = 1,
+    BlendIndices = 2,
+    Normal = 3,
+    UV = 4,
+    Tangent2 = 5,
+    Tangent1 = 6,
+    Color = 7,
+};
+
+struct VertexElement {
+    uint8_t stream, offset;
+    VertexType type;
+    VertexUsage usage;
+    uint8_t usageIndex;
+    uint8_t padding[3];
+};
+
+enum ModelFlags1 : uint8_t
+{
+    DustOcclusionEnabled = 0x80,
+    SnowOcclusionEnabled = 0x40,
+    RainOcclusionEnabled = 0x20,
+    Unknown1 = 0x10,
+    LightingReflectionEnabled = 0x08,
+    WavingAnimationDisabled = 0x04,
+    LightShadowDisabled = 0x02,
+    ShadowDisabled = 0x01,
+};
+
+enum ModelFlags2 : uint8_t
+{
+    Unknown2 = 0x80,
+    BgUvScrollEnabled = 0x40,
+    EnableForceNonResident = 0x20,
+    ExtraLodEnabled = 0x10,
+    ShadowMaskEnabled = 0x08,
+    ForceLodRangeEnabled = 0x04,
+    EdgeGeometryEnabled = 0x02,
+    Unknown3 = 0x01
+};
+
+struct ModelHeader {
+    float radius;
+    unsigned short meshCount;
+    unsigned short attributeCount;
+    unsigned short submeshCount;
+    unsigned short materialCount;
+    unsigned short boneCount;
+    unsigned short boneTableCount;
+    unsigned short shapeCount;
+    unsigned short shapeMeshCount;
+    unsigned short shapeValueCount;
+    uint8_t lodCount;
+
+    ModelFlags1 flags1;
+
+    unsigned short elementIdCount;
+    uint8_t terrainShadowMeshCount;
+
+    ModelFlags2 flags2;
+
+    float modelClipOutDistance;
+    float shadowClipOutDistance;
+    unsigned short unknown4;
+    unsigned short terrainShadowSubmeshCount;
+
+    uint8_t unknown5;
+
+    uint8_t bgChangeMaterialIndex;
+    uint8_t bgCrestChangeMaterialIndex;
+    uint8_t unknown6;
+    unsigned short unknown7, unknown8, unknown9;
+    uint8_t padding[6];
+};
+
+struct MeshLod {
+    unsigned short meshIndex;
+    unsigned short meshCount;
+    float modelLodRange;
+    float textureLodRange;
+    unsigned short waterMeshIndex;
+    unsigned short waterMeshCount;
+    unsigned short shadowMeshIndex;
+    unsigned short shadowMeshCount;
+    unsigned short terrainShadowMeshIndex;
+    unsigned short terrainShadowMeshCount;
+    unsigned short verticalFogMeshIndex;
+    unsigned short verticalFogMeshCount;
+
+    // unused on win32 according to lumina devs
+    unsigned int edgeGeometrySize;
+    unsigned int edgeGeometryDataOffset;
+    unsigned int polygonCount;
+    unsigned int unknown1;
+    unsigned int vertexBufferSize;
+    unsigned int indexBufferSize;
+    unsigned int vertexDataOffset;
+    unsigned int indexDataOffset;
+};
+
+struct ElementId {
+    uint32_t elementId;
+    uint32_t parentBoneName;
+    std::vector<float> translate;
+    std::vector<float> rotate;
+};
+
+struct Mesh {
+    unsigned short vertexCount;
+    unsigned short padding;
+    unsigned int indexCount;
+    unsigned short materialIndex;
+    unsigned short subMeshIndex;
+    unsigned short subMeshCount;
+    unsigned short boneTableIndex;
+    unsigned int startIndex;
+
+    std::vector<uint32_t> vertexBufferOffset;
+    std::vector<uint8_t> vertexBufferStride;
+
+    uint8_t vertexStreamCount;
+};
+
+struct Submesh {
+    unsigned int indexOffset;
+    unsigned int indexCount;
+    unsigned int attributeIndexMask;
+    unsigned short boneStartIndex;
+    unsigned short boneCount;
+};
+
+struct BoneTable {
+    std::vector<uint16_t> boneIndex;
+    uint8_t boneCount;
+    std::vector<uint8_t> padding;
+};
+
+struct BoundingBox {
+    std::array<float, 4> min, max;
+};
+
 Model parseMDL(MemorySpan data) {
-    struct ModelFileHeader {
-        uint32_t version;
-        uint32_t stackSize;
-        uint32_t runtimeSize;
-        unsigned short vertexDeclarationCount;
-        unsigned short materialCount;
-        uint32_t vertexOffsets[3];
-        uint32_t indexOffsets[3];
-        uint32_t vertexBufferSize[3];
-        uint32_t indexBufferSize[3];
-        uint8_t lodCount;
-        bool indexBufferStreamingEnabled;
-        bool hasEdgeGeometry;
-        uint8_t padding;
-    } modelFileHeader;
-
+    ModelFileHeader modelFileHeader;
     data.read(&modelFileHeader);
-
-    struct VertexElement {
-        uint8_t stream, offset, type, usage, usageIndex;
-        uint8_t padding[3];
-    };
 
     struct VertexDeclaration {
         std::vector<VertexElement> elements;
@@ -62,72 +210,8 @@ Model parseMDL(MemorySpan data) {
     std::vector<uint8_t> strings;
     data.read_structures(&strings, stringSize);
 
-    enum ModelFlags1 : uint8_t
-    {
-        DustOcclusionEnabled = 0x80,
-        SnowOcclusionEnabled = 0x40,
-        RainOcclusionEnabled = 0x20,
-        Unknown1 = 0x10,
-        LightingReflectionEnabled = 0x08,
-        WavingAnimationDisabled = 0x04,
-        LightShadowDisabled = 0x02,
-        ShadowDisabled = 0x01,
-    };
-
-    enum ModelFlags2 : uint8_t
-    {
-        Unknown2 = 0x80,
-        BgUvScrollEnabled = 0x40,
-        EnableForceNonResident = 0x20,
-        ExtraLodEnabled = 0x10,
-        ShadowMaskEnabled = 0x08,
-        ForceLodRangeEnabled = 0x04,
-        EdgeGeometryEnabled = 0x02,
-        Unknown3 = 0x01
-    };
-
-    struct ModelHeader {
-        float radius;
-        unsigned short meshCount;
-        unsigned short attributeCount;
-        unsigned short submeshCount;
-        unsigned short materialCount;
-        unsigned short boneCount;
-        unsigned short boneTableCount;
-        unsigned short shapeCount;
-        unsigned short shapeMeshCount;
-        unsigned short shapeValueCount;
-        uint8_t lodCount;
-
-        ModelFlags1 flags1;
-
-        unsigned short elementIdCount;
-        uint8_t terrainShadowMeshCount;
-
-        ModelFlags2 flags2;
-
-        float modelClipOutDistance;
-        float shadowClipOutDistance;
-        unsigned short unknown4;
-        unsigned short terrainShadowSubmeshCount;
-
-        uint8_t unknown5;
-
-        uint8_t bgChangeMaterialIndex;
-        uint8_t bgCrestChangeMaterialIndex;
-        uint8_t unknown6;
-        unsigned short unknown7, unknown8, unknown9;
-        uint8_t padding[6];
-    } modelHeader;
-
+    ModelHeader modelHeader;
     data.read(&modelHeader);
-
-    struct ElementId {
-        uint32_t elementId;
-        uint32_t  parentBoneName;
-        std::vector<float> translate;
-        std::vector<float> rotate;
-    };
 
     std::vector<ElementId> elementIds(modelHeader.elementIdCount);
     for(int i = 0; i < modelHeader.elementIdCount; i++) {
@@ -139,51 +223,8 @@ Model parseMDL(MemorySpan data) {
         data.read_structures(&elementIds[i].rotate, 3);
     }
 
-    struct Lod {
-        unsigned short meshIndex;
-        unsigned short meshCount;
-        float modelLodRange;
-        float textureLodRange;
-        unsigned short waterMeshIndex;
-        unsigned short waterMeshCount;
-        unsigned short shadowMeshIndex;
-        unsigned short shadowMeshCount;
-        unsigned short terrainShadowMeshIndex;
-        unsigned short terrainShadowMeshCount;
-        unsigned short verticalFogMeshIndex;
-        unsigned short verticalFogMeshCount;
-
-        // unused on win32 according to lumina devs
-        unsigned int edgeGeometrySize;
-        unsigned int edgeGeometryDataOffset;
-        unsigned int polygonCount;
-        unsigned int unknown1;
-        unsigned int vertexBufferSize;
-        unsigned int indexBufferSize;
-        unsigned int vertexDataOffset;
-        unsigned int indexDataOffset;
-    };
-
-    std::vector<Lod> lods;
-
-    // TODO: support models that support more than 3 lods
-    data.read_structures(&lods, 3);
-
-    struct Mesh {
-        unsigned short vertexCount;
-        unsigned short padding;
-        unsigned int indexCount;
-        unsigned short materialIndex;
-        unsigned short subMeshIndex;
-        unsigned short subMeshCount;
-        unsigned short boneTableIndex;
-        unsigned int startIndex;
-
-        std::vector<uint32_t> vertexBufferOffset;
-        std::vector<uint8_t> vertexBufferStride;
-
-        uint8_t vertexStreamCount;
-    };
+    std::vector<MeshLod> lods;
+    data.read_structures(&lods, modelHeader.lodCount);
 
     std::vector<Mesh> meshes(modelHeader.meshCount);
     for(int i = 0; i < modelHeader.meshCount; i++) {
@@ -207,14 +248,6 @@ Model parseMDL(MemorySpan data) {
 
     // TODO: implement terrain shadow meshes
 
-    struct Submesh {
-        unsigned int indexOffset;
-        unsigned int indexCount;
-        unsigned int attributeIndexMask;
-        unsigned short boneStartIndex;
-        unsigned short boneCount;
-    };
-
     std::vector<Submesh> submeshes;
     data.read_structures(&submeshes, modelHeader.submeshCount);
 
@@ -225,12 +258,6 @@ Model parseMDL(MemorySpan data) {
 
     std::vector<uint32_t> boneNameOffsets;
     data.read_structures(&boneNameOffsets, modelHeader.boneCount);
-
-    struct BoneTable {
-        std::vector<uint16_t> boneIndex;
-        uint8_t boneCount;
-        std::vector<uint8_t> padding;
-    };
 
     std::vector<BoneTable> boneTables(modelHeader.boneTableCount);
     for(int i = 0; i < modelHeader.boneTableCount; i++) {
@@ -254,10 +281,6 @@ Model parseMDL(MemorySpan data) {
 
     data.seek(paddingAmount, Seek::Current);
 
-    struct BoundingBox {
-        std::array<float, 4> min, max;
-    };
-
     BoundingBox boundingBoxes, modelBoundingBoxes, waterBoundingBoxes, verticalFogBoundingBoxes;
     data.read(&boundingBoxes);
     data.read(&modelBoundingBoxes);
@@ -270,48 +293,22 @@ Model parseMDL(MemorySpan data) {
     Model model;
 
     for(int i = 0; i < modelHeader.lodCount; i++) {
-        ::Lod lod;
+        Lod lod;
 
         for(int j = lods[i].meshIndex; j < (lods[i].meshIndex + lods[i].meshCount); j++) {
             Part part;
 
             const VertexDeclaration decl = vertexDecls[j];
 
-            enum VertexType : uint8_t {
-                Single3 = 2,
-                Single4 = 3,
-                UInt = 5,
-                ByteFloat4 = 8,
-                Half2 = 13,
-                Half4 = 14
-            };
-
-            enum VertexUsage : uint8_t  {
-                Position = 0,
-                BlendWeights = 1,
-                BlendIndices = 2,
-                Normal = 3,
-                UV = 4,
-                Tangent2 = 5,
-                Tangent1 = 6,
-                Color = 7,
-            };
-
             int vertexCount = meshes[j].vertexCount;
             std::vector<Vertex> vertices(vertexCount);
 
             for(int k = 0; k < vertexCount; k++) {
-                for(auto& orderedElement : decl.elements) {
-                    auto type = static_cast<VertexType>(orderedElement.type);
-                    auto usage = static_cast<VertexUsage>(orderedElement.usage);
-
-                    const int stream = orderedElement.stream;
-
-                    data.seek(lods[i].vertexDataOffset + meshes[j].vertexBufferOffset[stream] + orderedElement.offset + meshes[i].vertexBufferStride[stream] * k, Seek::Set);
+                for(auto& element : decl.elements) {
+                    data.seek(lods[i].vertexDataOffset + meshes[j].vertexBufferOffset[element.stream] + element.offset + meshes[i].vertexBufferStride[element.stream] * k, Seek::Set);
 
                     std::array<float, 4> floatData = {};
-
-                    switch(type) {
+                    switch(element.type) {
                         case VertexType::Single3:
                             data.read_array(floatData.data(), 3);
                             break;
@@ -351,12 +348,24 @@ Model parseMDL(MemorySpan data) {
                             break;
                     }
 
-                    switch(usage) {
+                    switch(element.usage) {
                         case VertexUsage::Position:
                             memcpy(vertices[k].position.data(), floatData.data(), sizeof(float) * 3);
                             break;
                         case VertexUsage::Normal:
                             memcpy(vertices[k].normal.data(), floatData.data(), sizeof(float) * 3);
+                            break;
+                        case BlendWeights:
+                            break;
+                        case BlendIndices:
+                            break;
+                        case UV:
+                            break;
+                        case Tangent2:
+                            break;
+                        case Tangent1:
+                            break;
+                        case Color:
                             break;
                     }
                 }
