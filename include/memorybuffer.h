@@ -3,6 +3,8 @@
 #include <string_view>
 #include <streambuf>
 #include <istream>
+#include <memory>
+#include <cstring>
 
 enum class Seek {
     Current,
@@ -39,15 +41,7 @@ struct MemoryBuffer {
         position = end;
     }
 
-    template <>
-    void write<std::vector<uint8_t>>(const std::vector<uint8_t>& t) {
-        size_t end = position + (sizeof(uint8_t) * t.size());
-        if(end > data.size())
-            data.resize(end);
 
-        data.insert(data.begin() + position, t.begin(), t.end());
-        position = end;
-    }
 
     size_t size() const {
         return data.size();
@@ -62,6 +56,16 @@ struct MemoryBuffer {
 private:
     size_t position = 0;
 };
+
+template<>
+void MemoryBuffer::write<std::vector<uint8_t>>(const std::vector<uint8_t>& t) {
+    size_t end = position + (sizeof(uint8_t) * t.size());
+    if(end > data.size())
+        data.resize(end);
+
+    data.insert(data.begin() + position, t.begin(), t.end());
+    position = end;
+}
 
 struct MemorySpan {
     MemorySpan(const MemoryBuffer& new_buffer) : buffer(new_buffer) {}
