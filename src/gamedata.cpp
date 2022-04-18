@@ -347,6 +347,33 @@ std::optional<MemoryBuffer> GameData::extractFile(const std::string_view data_fi
     }
 
     fmt::print("Failed to find file {}.\n", data_file_path);
+
+    return std::nullopt;
+}
+
+bool GameData::exists(std::string_view data_file_path) {
+    const uint64_t hash = calculateHash(data_file_path);
+    auto [repository, category] = calculateRepositoryCategory(data_file_path);
+
+    auto [index_filename, index2_filename] = repository.get_index_filenames(categoryToID[category]);
+    auto index_path = fmt::format("{data_directory}/{repository}/{filename}",
+                                  fmt::arg("data_directory", dataDirectory),
+                                  fmt::arg("repository", repository.name),
+                                  fmt::arg("filename", index_filename));
+    auto index2_path = fmt::format("{data_directory}/{repository}/{filename}",
+                                   fmt::arg("data_directory", dataDirectory),
+                                   fmt::arg("repository", repository.name),
+                                   fmt::arg("filename", index2_filename));
+
+    auto index_file = read_index_files(index_path, index2_path);
+
+    for(const auto entry : index_file.entries) {
+        if (entry.hash == hash) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::optional<EXH> GameData::readExcelSheet(std::string_view name) {

@@ -30,6 +30,8 @@ public:
     [[nodiscard]]
     std::optional<MemoryBuffer> extractFile(std::string_view data_file_path);
 
+    bool exists(std::string_view data_file_path);
+
     IndexFile<IndexHashTableEntry> getIndexListing(std::string_view folder);
 
     void extractSkeleton();
