@@ -159,8 +159,8 @@ struct Mesh {
 };
 
 struct Submesh {
-    unsigned int indexOffset;
-    unsigned int indexCount;
+    int32_t indexOffset;
+    int32_t indexCount;
     unsigned int attributeIndexMask;
     unsigned short boneStartIndex;
     unsigned short boneCount;
@@ -292,6 +292,18 @@ Model parseMDL(MemorySpan data) {
 
     Model model;
 
+    for(auto offset : boneNameOffsets) {
+        std::string name;
+        char nextChar = strings[offset];
+        while(nextChar != '\0') {
+            name += nextChar;
+            offset++;
+            nextChar = strings[offset];
+        }
+
+        model.affectedBoneNames.push_back(name);
+    }
+
     for(int i = 0; i < modelHeader.lodCount; i++) {
         Lod lod;
 
@@ -303,11 +315,22 @@ Model parseMDL(MemorySpan data) {
             int vertexCount = meshes[j].vertexCount;
             std::vector<Vertex> vertices(vertexCount);
 
+            for(int k = meshes[j].subMeshIndex; k < (meshes[j].subMeshIndex + meshes[j].subMeshCount); k++) {
+                PartSubmesh submesh;
+                submesh.indexCount = submeshes[k].indexCount;
+                submesh.indexOffset = submeshes[k].indexOffset;
+                submesh.boneCount = submeshes[k].boneCount;
+                submesh.boneStartIndex = submeshes[k].boneStartIndex;
+
+                part.submeshes.push_back(submesh);
+            }
+
             for(int k = 0; k < vertexCount; k++) {
                 for(auto& element : decl.elements) {
                     data.seek(lods[i].vertexDataOffset + meshes[j].vertexBufferOffset[element.stream] + element.offset + meshes[i].vertexBufferStride[element.stream] * k, Seek::Set);
 
                     std::array<float, 4> floatData = {};
+                    std::array<uint8_t, 4> intData = {};
                     switch(element.type) {
                         case VertexType::Single3:
                             data.read_array(floatData.data(), 3);
@@ -316,7 +339,7 @@ Model parseMDL(MemorySpan data) {
                             data.read_array(floatData.data(), 4);
                             break;
                         case VertexType::UInt:
-                            data.seek(sizeof(uint8_t) * 4, Seek::Current);
+                            data.read_array(intData.data(), 4);
                             break;
                         case VertexType::ByteFloat4: {
                             uint8_t values[4];
@@ -329,7 +352,7 @@ Model parseMDL(MemorySpan data) {
                         }
                             break;
                         case VertexType::Half2: {
-                            uint16_t values[2];
+                            uint16_t values[2] = {};
                             data.read_array(values, 2);
 
                             floatData[0] = half_to_float(values[0]);
@@ -337,7 +360,7 @@ Model parseMDL(MemorySpan data) {
                         }
                             break;
                         case VertexType::Half4: {
-                            uint16_t values[4];
+                            uint16_t values[4] = {};
                             data.read_array(values, 4);
 
                             floatData[0] = half_to_float(values[0]);
@@ -356,10 +379,13 @@ Model parseMDL(MemorySpan data) {
                             memcpy(vertices[k].normal.data(), floatData.data(), sizeof(float) * 3);
                             break;
                         case BlendWeights:
+                            memcpy(vertices[k].boneWeights.data(), floatData.data(), sizeof(float) * 4);
                             break;
                         case BlendIndices:
+                            memcpy(vertices[k].boneIds.data(), intData.data(), sizeof(uint8_t) * 4);
                             break;
                         case UV:
+                            memcpy(vertices[k].uv.data(), floatData.data(), sizeof(float) * 2);
                             break;
                         case Tangent2:
                             break;

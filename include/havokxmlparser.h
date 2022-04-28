@@ -3,13 +3,14 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <glm/glm.hpp>
 
 struct Bone {
     std::string name;
 
     Bone* parent = nullptr;
 
-    std::array<float, 16> localTransform, finalTransform;
+    glm::mat4 localTransform, finalTransform, inversePose;
 
     std::array<float, 3> position;
     std::array<float, 4> rotation;

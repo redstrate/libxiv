@@ -58,7 +58,7 @@ private:
 };
 
 template<>
-void MemoryBuffer::write<std::vector<uint8_t>>(const std::vector<uint8_t>& t) {
+inline void MemoryBuffer::write<std::vector<uint8_t>>(const std::vector<uint8_t>& t) {
     size_t end = position + (sizeof(uint8_t) * t.size());
     if(end > data.size())
         data.resize(end);
