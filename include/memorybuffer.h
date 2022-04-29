@@ -5,6 +5,7 @@
 #include <istream>
 #include <memory>
 #include <cstring>
+#include <vector>
 
 enum class Seek {
     Current,
@@ -40,8 +41,6 @@ struct MemoryBuffer {
 
         position = end;
     }
-
-
 
     size_t size() const {
         return data.size();
@@ -143,3 +142,4 @@ private:
 };
 
 void write_buffer_to_file(const MemoryBuffer& buffer, std::string_view path);
+MemoryBuffer read_file_to_buffer(std::string_view path);
