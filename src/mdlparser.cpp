@@ -224,7 +224,7 @@ Model parseMDL(MemorySpan data) {
     }
 
     std::vector<MeshLod> lods;
-    data.read_structures(&lods, modelHeader.lodCount);
+    data.read_structures(&lods, 3);
 
     std::vector<Mesh> meshes(modelHeader.meshCount);
     for(int i = 0; i < modelHeader.meshCount; i++) {
