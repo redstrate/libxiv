@@ -77,6 +77,14 @@ else()
     FetchContent_MakeAvailable(pugixml)
 endif()
 
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG 0.9.9.8
+)
+
+FetchContent_MakeAvailable(glm)
+
 add_library(libxiv STATIC
         src/fiinparser.cpp
         src/indexparser.cpp
@@ -92,9 +100,10 @@ add_library(libxiv STATIC
         src/havokxmlparser.cpp
         src/types.cpp
         src/equipment.cpp
-        src/sqpack.cpp)
+        src/sqpack.cpp
+        src/memorybuffer.cpp)
 target_include_directories(libxiv PUBLIC include PRIVATE src)
-target_link_libraries(libxiv PUBLIC ${LIBRARIES} pugixml::pugixml)
+target_link_libraries(libxiv PUBLIC ${LIBRARIES} pugixml::pugixml glm::glm)
 target_link_directories(libxiv PUBLIC ${LIB_DIRS})
 target_compile_features(libxiv PUBLIC cxx_std_17)
 set_target_properties(libxiv PROPERTIES CXX_EXTENSIONS OFF)
