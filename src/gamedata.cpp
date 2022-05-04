@@ -397,8 +397,9 @@ std::optional<EXH> GameData::readExcelSheet(std::string_view name) {
     return {};
 }
 
-void GameData::extractSkeleton() {
-    const std::string path = fmt::format("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb");
+void GameData::extractSkeleton(Race race) {
+    const std::string path = fmt::format("chara/human/c{race:04d}/skeleton/base/b0001/skl_c{race:04d}b0001.sklb",
+                                         fmt::arg("race", get_race_id(race)));
     auto skel_data = extractFile(path);
     auto skel_span = MemorySpan(*skel_data);
 
@@ -433,7 +434,10 @@ void GameData::extractSkeleton() {
     std::vector<uint8_t> havokData(skel_span.size() - dataOffset);
     skel_span.read_structures(&havokData, havokData.size());
 
-    FILE* newFile = fopen("test.sklb.havok", "wb");
+    const std::string outputName = fmt::format("skl_c{race:04d}b0001.sklb",
+                                               fmt::arg("race", get_race_id(race)));
+
+    FILE* newFile = fopen(outputName.c_str(), "wb");
     fwrite(havokData.data(), havokData.size(), 1, newFile);
 
     fclose(newFile);

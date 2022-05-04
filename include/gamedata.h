@@ -8,6 +8,7 @@
 #include "indexparser.h"
 #include "sqpack.h"
 #include "memorybuffer.h"
+#include "types/race.h"
 
 /*
  * This handles reading/extracting the raw data from game data packs, such as dat0, index and index2 files.
@@ -34,7 +35,7 @@ public:
 
     IndexFile<IndexHashTableEntry> getIndexListing(std::string_view folder);
 
-    void extractSkeleton();
+    void extractSkeleton(Race race);
 
     std::optional<EXH> readExcelSheet(std::string_view name);
 

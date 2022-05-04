@@ -33,7 +33,7 @@ Skeleton parseHavokXML(const std::string_view path) {
     pugi::xml_document doc;
     doc.load_file(path.data());
 
-    pugi::xpath_node build_tool = doc.select_node("//hkobject[@name=\"#0052\"]/hkparam[@name=\"bones\"]");
+    pugi::xpath_node build_tool = doc.select_node("//hkobject/hkparam[@name=\"bones\"]");
 
     auto bonesNode = build_tool.node();
 
@@ -71,7 +71,7 @@ Skeleton parseHavokXML(const std::string_view path) {
 
     walkSkeleton(skeleton, skeleton.root_bone);
 
-    pugi::xpath_node build_tool2 = doc.select_node("//hkobject[@name=\"#0052\"]/hkparam[@name=\"referencePose\"]");
+    pugi::xpath_node build_tool2 = doc.select_node("//hkobject/hkparam[@name=\"referencePose\"]");
 
     fmt::print("num ref poses: {}\n", build_tool2.node().attribute("numelements").as_int());
 
