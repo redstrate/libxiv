@@ -1,4 +1,11 @@
 # libxiv
+
+## Deprecation Notice
+
+I have stopped development for libxiv completely, instead refocusing my efforts into [physis](https://sr.ht/~redstrate/physis) - it's sucessor.
+
+---
+
 A modding framework for FFXIV written in C++. This is used in [Novus](https://git.sr.ht/~redstrate/novus) (my custom modding tool) and
 [Astra](https://git.sr.ht/~redstrate/astra) (my custom launcher) but can easily be integrated into your own projects.
 
